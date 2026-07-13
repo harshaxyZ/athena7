@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "concurrently --kill-others --names backend,frontend --prefix-colors cyan,white \"pnpm dev:backend\" \"pnpm dev:frontend\"",
-    "dev:backend": "python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload",
+    "dev:backend": "uv run --with-requirements backend/requirements.txt uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload",
     "dev:frontend": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "concurrently --kill-others --names backend,frontend \"pnpm start:backend\" \"pnpm start:frontend\"",
-    "start:backend": "python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000",
+    "start:backend": "uv run --with-requirements backend/requirements.txt uvicorn backend.main:app --host 0.0.0.0 --port 8000",
     "start:frontend": "next start --hostname 0.0.0.0 --port 3000",
     "lint": "eslint ."
   },
