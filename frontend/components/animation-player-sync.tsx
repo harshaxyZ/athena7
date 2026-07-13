@@ -27,6 +27,7 @@ type AnimationPlayerSyncProps = {
   caption: string
   duration?: number
   beats?: Beat[]
+  audio_base64?: string
   part?: number
   total_parts?: number
   onPartEnd?: () => void
@@ -39,6 +40,7 @@ export function AnimationPlayerSync({
   caption,
   duration = 14,
   beats = [],
+  audio_base64,
   part = 1,
   total_parts = 1,
   onPartEnd,
@@ -71,6 +73,27 @@ export function AnimationPlayerSync({
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
   }, [])
+
+  // Load audio with WAV MIME type
+  useEffect(() => {
+    if (audio_base64 && audioRef.current) {
+      const src = `data:audio/wav;base64,${audio_base64}`
+      audioRef.current.src = src
+      if (isPlaying) {
+        audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e.message))
+      }
+    }
+  }, [audio_base64, isPlaying])
+
+  // Audio playback sync with animation
+  useEffect(() => {
+    if (!audioRef.current) return
+    if (isPlaying) {
+      audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e.message))
+    } else {
+      audioRef.current.pause()
+    }
+  }, [isPlaying])
 
   // Subtitle sync
   useEffect(() => {
@@ -284,8 +307,14 @@ export function AnimationPlayerSync({
         </div>
       </div>
 
-      {/* Hidden audio */}
-      <audio ref={audioRef} className="hidden" muted={isMuted} crossOrigin="anonymous" />
+      {/* Hidden audio - synchronized with animation */}
+      <audio 
+        ref={audioRef} 
+        className="hidden" 
+        volume={isMuted ? 0 : 1}
+        crossOrigin="anonymous"
+        onEnded={() => onPartEnd?.()} 
+      />
     </div>
   )
 }

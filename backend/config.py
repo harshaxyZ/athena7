@@ -14,12 +14,17 @@ class Settings:
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
     OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "z-ai/glm-5.2")
     OPENROUTER_FALLBACK_MODEL: str = os.getenv("OPENROUTER_FALLBACK_MODEL", "google/gemini-2.5-flash")
+    
+    # ── Claude Models for Visual Generation ──────────────────────
+    OPENROUTER_VISUAL_PLANNER_MODEL: str = os.getenv("OPENROUTER_VISUAL_PLANNER_MODEL", "anthropic/claude-opus-4.8")
+    OPENROUTER_VISUAL_GENERATOR_MODEL: str = os.getenv("OPENROUTER_VISUAL_GENERATOR_MODEL", "anthropic/claude-sonnet-4.6")
 
     # ── Sarvam AI TTS ──────────────────────────────────────────────
     SARVAM_API_KEY: str = os.getenv("SARVAM_API_KEY", "")
     SARVAM_BASE_URL: str = os.getenv("SARVAM_BASE_URL", "https://api.sarvam.ai")
     SARVAM_TTS_MODEL: str = os.getenv("SARVAM_TTS_MODEL", "bulbul:v3")
-    SARVAM_DEFAULT_VOICE: str = os.getenv("SARVAM_DEFAULT_VOICE", "shubh")
+    SARVAM_DEFAULT_VOICE: str = os.getenv("SARVAM_DEFAULT_VOICE", "shubh")  # Male voice
+    SARVAM_FEMALE_VOICE: str = os.getenv("SARVAM_FEMALE_VOICE", "shruti")  # Female voice
     SARVAM_DEFAULT_LANGUAGE: str = os.getenv("SARVAM_DEFAULT_LANGUAGE", "hi-IN")
     SARVAM_SAMPLE_RATE: int = int(os.getenv("SARVAM_SAMPLE_RATE", "22050"))
     SARVAM_AUDIO_FORMAT: str = os.getenv("SARVAM_AUDIO_FORMAT", "wav")

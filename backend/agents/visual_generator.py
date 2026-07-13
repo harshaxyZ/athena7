@@ -229,7 +229,7 @@ async def generate_chat_visual(topic: str, description: str, session_id: str = "
         {"role": "system", "content": "You are an animation director. Return compact JSON only with title, caption, duration (seconds), visual_style, and 3-5 timed beats containing action, objects, camera, and narration."},
         {"role": "user", "content": f"Exact student request: {topic}\nTeaching context: {description[:900]}{part_suffix}\n\nRETURN ONLY VALID JSON."}
     ]
-    plan_raw = await llm_chat(messages=plan_prompt, model="anthropic/claude-opus-4.8", temperature=0.35, max_tokens=900, agent="visual_planner", session_id=session_id)
+    plan_raw = await llm_chat(messages=plan_prompt, model=settings.OPENROUTER_VISUAL_PLANNER_MODEL, temperature=0.35, max_tokens=900, agent="visual_planner", session_id=session_id)
     cleaned_plan = re.sub(r"^```json\s*|\s*```$", "", plan_raw.strip(), flags=re.IGNORECASE)
     try:
         plan = json.loads(cleaned_plan)
@@ -247,18 +247,29 @@ async def generate_chat_visual(topic: str, description: str, session_id: str = "
     feedback = ""
     for attempt in range(2):
         request = messages if not feedback else messages + [{"role": "user", "content": f"The previous program failed validation: {feedback}. Rewrite it as safe raw JavaScript only."}]
-        code = await llm_chat(messages=request, model="anthropic/claude-sonnet-4-6", temperature=0.45, max_tokens=3200, agent="visual_generator", session_id=session_id)
+        code = await llm_chat(messages=request, model=settings.OPENROUTER_VISUAL_GENERATOR_MODEL, temperature=0.45, max_tokens=3200, agent="visual_generator", session_id=session_id)
         program = _sanitize(code)
         feedback = _validation_error(program) or ""
         if not feedback:
+            # Generate TTS audio for animation narration
+            audio_base64 = None
+            narration = str(plan.get("caption", description[:220]))
+            if narration:
+                try:
+                    from backend.services.tts import text_to_speech_base64
+                    audio_base64 = await text_to_speech_base64(narration, language="en-IN")
+                except Exception as e:
+                    logger.warning(f"TTS generation failed: {e}")
+            
             return {
                 "type": "js_scene",
                 "code": program,
                 "plan": plan,
                 "topic": topic,
-                "caption": str(plan.get("caption", description[:220])),
+                "caption": narration,
                 "duration": plan["duration"],
                 "beats": plan.get("beats", []),
+                "audio_base64": audio_base64,
                 "part": part,
                 "total_parts": total_parts,
             }

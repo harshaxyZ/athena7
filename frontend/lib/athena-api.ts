@@ -23,6 +23,8 @@ export type AnimationData = {
   caption: string
   duration: number
   beats?: Beat[]
+  audio_base64?: string
+  voice_id?: string
   part?: number
   total_parts?: number
   plan?: { title?: string }

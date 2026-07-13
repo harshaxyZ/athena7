@@ -470,6 +470,7 @@ export function AthenaWorkspace() {
                         caption={animationParts[currentPartIndex]?.caption || ""}
                         duration={animationParts[currentPartIndex]?.duration || 14}
                         beats={animationParts[currentPartIndex]?.beats || []}
+                        audio_base64={animationParts[currentPartIndex]?.audio_base64}
                         part={animationParts[currentPartIndex]?.part || 1}
                         total_parts={animationParts[currentPartIndex]?.total_parts || 1}
                         autoPlay
@@ -518,6 +519,7 @@ export function AthenaWorkspace() {
                         caption={animationParts[currentPartIndex]?.caption || response}
                         duration={animationParts[currentPartIndex]?.duration || 14}
                         beats={animationParts[currentPartIndex]?.beats || []}
+                        audio_base64={animationParts[currentPartIndex]?.audio_base64}
                         part={animationParts[currentPartIndex]?.part}
                         total_parts={animationParts[currentPartIndex]?.total_parts}
                         autoPlay={false}

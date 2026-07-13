@@ -54,25 +54,20 @@ export function AnimationSkeleton({ part = 1, total_parts = 1, message }: Animat
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center gap-6 px-8 text-center">
-        {/* Animated triangle loader */}
-        <div className="relative">
-          <svg className="size-16" fill="none" viewBox="0 0 64 64">
-            <rect x="8" y="8" width="48" height="48" rx="6" stroke="currentColor" strokeWidth="1.5" transform="rotate(45 32 32)" opacity="0.12" />
-            <rect
-              className="athena-loader-path"
-              x="8" y="8" width="48" height="48"
-              rx="6"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeWidth="2.5"
-              transform="rotate(45 32 32)"
-              pathLength="100"
-            />
-          </svg>
-
-          {/* Orbiting dot */}
-          <span className="orbit absolute left-1/2 top-1/2 -ml-1 -mt-1 size-2 rounded-full bg-foreground" />
-        </div>
+        {/* Animated loader - single square */}
+        <svg className="size-16" fill="none" viewBox="0 0 64 64">
+          <rect x="8" y="8" width="48" height="48" rx="6" stroke="currentColor" strokeWidth="1.5" transform="rotate(45 32 32)" opacity="0.12" />
+          <rect
+            className="athena-loader-path"
+            x="8" y="8" width="48" height="48"
+            rx="6"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="2.5"
+            transform="rotate(45 32 32)"
+            pathLength="100"
+          />
+        </svg>
 
         {/* Step message */}
         <div className="flex flex-col items-center gap-2">
