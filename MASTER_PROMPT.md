@@ -98,21 +98,30 @@ backend/
 
 ## AI MODELS & SERVICES
 
-### LLM (Text Generation)
-**Primary:** `z-ai/glm-5.2` (via OpenRouter)  
+### Content Analysis & Planning (GLM)
+**Model:** `z-ai/glm-5.2` (via OpenRouter)  
 **Fallback:** `google/gemini-2.5-flash` (via OpenRouter)  
-**Provider:** [OpenRouter](https://openrouter.ai) — aggregates multiple LLM APIs  
-**Purpose:** Concept analysis, visual descriptions, narration generation  
+**Purpose:** Initial document parsing, concept extraction, lesson outline generation  
 **API Endpoint:** `https://openrouter.ai/api/v1`
 
-### Text-to-Speech (TTS)
+### Animation & Visual Generation (Claude)
+**Visual Planner:** `anthropic/claude-opus-4.8`  
+  - Temperature: 0.35 | Max Tokens: 900
+  - Creates detailed frame-by-frame animation storyboards and scene composition strategies
+  
+**Visual Code Generator:** `anthropic/claude-sonnet-4-6`  
+  - Temperature: 0.45 | Max Tokens: 3200
+  - Transforms visual plans into production-ready GSAP/Canvas animation code
+
+**Alternative (Optional):** `qwen/qwen-3.6-flash-02-12` (cost-optimized option, pricing tracked)
+
+### Text-to-Speech (Sarvam AI)
 **Provider:** [Sarvam AI](https://sarvam.ai)  
 **Model:** `bulbul:v3`  
 **Languages Supported:** 10 Indian languages (EN-IN, HI-IN, TA-IN, TE-IN, KN-IN, BN-IN, MR-IN, GU-IN, ML-IN, PA-IN)  
 **Default Voice:** "shubh" (male voice)  
 **Default Language:** hi-IN (Hindi)  
-**Sample Rate:** 22050 Hz  
-**Format:** WAV
+**Sample Rate:** 22050 Hz | **Format:** WAV
 
 ---
 
