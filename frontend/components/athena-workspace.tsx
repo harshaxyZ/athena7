@@ -39,9 +39,9 @@ const chats = [
 ]
 
 const prompts = [
-  { icon: Atom, label: "Quantum entanglement", detail: "Follow two particles across space", color: "text-violet-400", bg: "bg-violet-500/10 group-hover:bg-violet-500/20" },
-  { icon: FlaskConical, label: "CRISPR gene editing", detail: "Step inside a living cell", color: "text-emerald-400", bg: "bg-emerald-500/10 group-hover:bg-emerald-500/20" },
-  { icon: BookOpen, label: "The Indian monsoon", detail: "Fly with the seasonal winds", color: "text-sky-400", bg: "bg-sky-500/10 group-hover:bg-sky-500/20" },
+  { icon: Atom, label: "Quantum entanglement", detail: "Follow two particles across space", color: "text-violet-400", bg: "bg-violet-500/10" },
+  { icon: FlaskConical, label: "CRISPR gene editing", detail: "Step inside a living cell", color: "text-emerald-400", bg: "bg-emerald-500/10" },
+  { icon: BookOpen, label: "The Indian monsoon", detail: "Fly with the seasonal winds", color: "text-sky-400", bg: "bg-sky-500/10" },
 ]
 
 const generationSteps = [
@@ -382,7 +382,7 @@ export function AthenaWorkspace() {
                           <span className="cursor" aria-hidden="true" />
                         </span>
                       ) : (
-                        "Here&apos;s your visual explanation."
+                        <span>{"Here's your visual explanation."}</span>
                       )}
                     </h2>
                     {response && (
@@ -546,7 +546,7 @@ export function AthenaWorkspace() {
                   }
                 }}
                 className="max-h-44 min-h-[3.5rem] w-full resize-none bg-transparent px-4 py-3.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/60"
-                placeholder="Ask anything — &ldquo;How does a black hole form?&rdquo; or paste your notes..."
+                placeholder={`Ask anything \u2014 \u201cHow does a black hole form?\u201d or paste your notes\u2026`}
               />
               <div className="flex items-center justify-between gap-2 px-2 pb-2">
                 <div className="flex items-center gap-1">
