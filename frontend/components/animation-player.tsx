@@ -28,7 +28,14 @@ const scenes = [
 
 const narrationScript = scenes.map((item) => item.caption).join(" ")
 
-export function AnimationPlayer() {
+type AnimationPlayerProps = {
+  code: string
+  topic: string
+  caption: string
+  duration?: number
+}
+
+export function AnimationPlayer({ code, topic, caption, duration = 14 }: AnimationPlayerProps) {
   const sceneRef = useRef<HTMLDivElement>(null)
   const timelineRef = useRef<gsap.core.Timeline | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -39,6 +46,9 @@ export function AnimationPlayer() {
   const [captions, setCaptions] = useState(true)
   const [speed, setSpeed] = useState(1)
   const [scene, setScene] = useState(0)
+  const [renderKey, setRenderKey] = useState(0)
+  const safeCode = code.replace(/<\/script/gi, "<\\/script")
+  const sandboxDocument = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'unsafe-inline';"><style>*{box-sizing:border-box}html,body,#stage{margin:0;width:100%;height:100%;overflow:hidden;background:#10131c}canvas{width:100%;height:100%;display:block}</style></head><body><div id="stage"><canvas id="board" width="1600" height="900"></canvas></div><script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script><script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script><script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script><script src="https://cdn.jsdelivr.net/npm/p5@1.11.8/lib/p5.min.js"></script><script src="https://cdn.jsdelivr.net/npm/fabric@6.7.1/dist/index.min.js"></script><script src="https://cdn.jsdelivr.net/npm/paper@0.12.18/dist/paper-full.min.js"></script><script>const board=document.getElementById('board'),ctx=board.getContext('2d'),stage=document.getElementById('stage'),rc=rough.canvas(board);try{${safeCode}\nparent.postMessage({type:'athena-ready'},'*')}catch(error){ctx.fillStyle='#fff';ctx.font='28px sans-serif';ctx.fillText('Animation error: '+error.message,80,100);parent.postMessage({type:'athena-error',message:error.message},'*')}</script></body></html>`
 
   useEffect(() => {
     const context = gsap.context(() => {
@@ -87,7 +97,7 @@ export function AnimationPlayer() {
 
   useEffect(() => {
     let objectUrl = ""
-    createNarration(narrationScript)
+    createNarration(caption)
       .then((url) => {
         objectUrl = url
         const audio = new Audio(url)
@@ -131,6 +141,7 @@ export function AnimationPlayer() {
   }
 
   const replay = () => {
+    setRenderKey((value) => value + 1)
     timelineRef.current?.restart()
     if (audioRef.current) {
       audioRef.current.currentTime = 0
@@ -147,8 +158,8 @@ export function AnimationPlayer() {
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{scene + 1}</span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">Photosynthesis: from light to life</p>
-              <p className="text-xs text-muted-foreground">Scene {scene + 1} of {scenes.length} · {scenes[scene].label}</p>
+              <p className="truncate text-sm font-medium">{topic}</p>
+              <p className="text-xs text-muted-foreground">AI-generated canvas animation · {duration}s</p>
             </div>
           </div>
           <button className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" onClick={() => setExpanded(!expanded)} aria-label={expanded ? "Close fullscreen" : "Open fullscreen"}>
@@ -158,12 +169,13 @@ export function AnimationPlayer() {
 
         <div ref={sceneRef} className="relative aspect-video min-h-0 w-full overflow-hidden bg-[#f3f2ed] text-[#121212]">
           <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4 md:p-6">
-            <div className="rounded-full border border-black/10 bg-[#f3f2ed] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] md:text-xs">Inside a leaf</div>
+            <div className="rounded-full border border-black/10 bg-[#f3f2ed] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] md:text-xs">AI visual story</div>
             <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-black/60 md:text-xs"><Gauge className="size-4" /> 60 fps</div>
           </div>
 
-          <CinematicPhotosynthesis />
-          <svg className="hidden" viewBox="0 0 960 540" aria-hidden="true">
+          <iframe key={renderKey} title={`Animation: ${topic}`} sandbox="allow-scripts" srcDoc={sandboxDocument} className="absolute inset-0 size-full border-0" />
+          <div className="hidden"><CinematicPhotosynthesis />
+          <svg viewBox="0 0 960 540" aria-hidden="true">
             <circle data-sun cx="125" cy="130" r="50" fill="#ff6b4a" />
             {[0, 1, 2, 3].map((ray) => (
               <path key={ray} data-ray d={`M ${180 + ray * 4} ${145 + ray * 21} C 300 ${130 + ray * 30}, 340 ${175 + ray * 35}, 425 ${190 + ray * 38}`} fill="none" stroke="#ff6b4a" strokeDasharray="160" strokeDashoffset="160" strokeLinecap="round" strokeWidth="5" opacity={0.9 - ray * 0.12} />
@@ -192,7 +204,8 @@ export function AnimationPlayer() {
             </g>
           </svg>
 
-          {captions && <div className="absolute inset-x-4 bottom-4 mx-auto max-w-2xl rounded-xl bg-[#121212] px-4 py-3 text-center text-sm leading-relaxed text-[#f3f2ed] shadow-xl md:bottom-6 md:text-base">{scenes[scene].caption}</div>}
+          </div>
+          {captions && <div className="absolute inset-x-4 bottom-4 mx-auto max-w-2xl rounded-xl bg-[#121212]/90 px-4 py-3 text-center text-sm leading-relaxed text-[#f3f2ed] shadow-xl backdrop-blur md:bottom-6 md:text-base">{caption}</div>}
         </div>
 
         <div className="flex flex-col gap-2 bg-card px-3 py-3 md:px-4">

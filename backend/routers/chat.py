@@ -10,7 +10,9 @@ import asyncio
 import json
 import logging
 import time
+import tempfile
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
@@ -85,35 +87,51 @@ async def chat_message(
     if not conversation_id:
         conversation_id = str(uuid.uuid4())
 
-    # Load existing messages or start fresh
+    # Load existing messages from memory or disk so context survives restarts.
     messages = _conversations.get(conversation_id, [])
+    if not messages:
+        persisted = load_conversation(conversation_id)
+        if persisted:
+            messages = persisted.get("messages", [])
 
-    # Handle file upload if present
-    file_content = ""
+    # Retain the latest attachment context across follow-up turns.
+    document_context = next((msg.get("document_context", "") for msg in reversed(messages) if msg.get("document_context")), "")
+    document_name = next((msg.get("document_name", "") for msg in reversed(messages) if msg.get("document_name")), "")
+    extraction_notice = ""
     if file:
         try:
             content = await file.read()
             if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
-                return {"error": "File too large (max 20MB)"}
-
-            # Extract text from PDF
-            if file.filename and file.filename.lower().endswith(".pdf"):
-                import fitz  # PyMuPDF
-                doc = fitz.open(stream=content, filetype="pdf")
-                for page in doc:
-                    file_content += page.get_text()
-                doc.close()
-            else:
-                file_content = content.decode("utf-8", errors="ignore")
-        except Exception as e:
-            logger.error(f"File processing error: {e}")
-            file_content = f"[Error reading file: {e}]"
+                raise ValueError(f"File too large (maximum {settings.MAX_FILE_SIZE_MB} MB)")
+            suffix = Path(file.filename or "upload").suffix.lower()
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temporary:
+                temporary.write(content)
+                temporary_path = temporary.name
+            try:
+                from backend.services.file_processor import extract_content
+                blocks = extract_content(temporary_path, suffix)
+            finally:
+                Path(temporary_path).unlink(missing_ok=True)
+            labelled = []
+            for block in blocks:
+                if block.get("type") != "text":
+                    continue
+                label = block.get("section") or (f"Page {block.get('page')}" if block.get("page") else "Document")
+                labelled.append(f"[{label}]\n{block.get('content', '')}")
+            document_context = "\n\n".join(labelled)[:40000]
+            document_name = file.filename or "attachment"
+            extraction_notice = f"Extracted {len(labelled)} text sections from {document_name}."
+        except Exception as exc:
+            logger.warning("Attachment extraction failed: %s", exc)
+            extraction_notice = str(exc)
 
     # Add user message
     user_msg = {
         "role": "user",
         "content": message,
         "timestamp": time.time(),
+        "document_name": document_name,
+        "document_context": document_context,
     }
     messages.append(user_msg)
 
@@ -127,8 +145,10 @@ async def chat_message(
         lang2_name = settings.SUPPORTED_LANGUAGES.get(secondary_language, secondary_language)
         system_prompt += f"\n\nThe student also understands {lang2_name}. Use it occasionally for emphasis."
 
-    if file_content:
-        system_prompt += f"\n\nSTUDENT'S DOCUMENT CONTENT:\n---\n{file_content[:8000]}\n---\n\nExplain the concepts from this document."
+    if document_context:
+        system_prompt += f"\n\nRETAINED STUDY MATERIAL ({document_name}):\n---\n{document_context[:30000]}\n---\nUse this material for the current and follow-up questions. Cite page, slide, or section labels when available."
+    if extraction_notice:
+        system_prompt += f"\nAttachment status: {extraction_notice}"
 
     # Check if user wants animation
     wants_animation = any(kw in message.lower() for kw in [
@@ -158,26 +178,18 @@ async def chat_message(
                 full_response += token
                 yield f"data: {json.dumps({'type': 'text', 'content': token})}\n\n"
 
-            # Generate animation if requested
+            # Generate a storyboard and topic-specific canvas program when requested.
             if wants_animation and full_response:
-                yield f"data: {json.dumps({'type': 'status', 'content': 'Generating animation...'})}\n\n"
                 try:
+                    yield f"data: {json.dumps({'type': 'status', 'content': 'Planning the visual story'})}\n\n"
                     from backend.agents.visual_generator import generate_chat_visual
-                    js_code = await generate_chat_visual(
-                        topic=message,
-                        description=full_response[:500],
-                        session_id=conversation_id,
-                    )
-                    yield f"data: {json.dumps({'type': 'animation', 'data': {'type': 'js_scene', 'code': js_code}})}\n\n"
+                    animation_data = await generate_chat_visual(topic=message, description=full_response, session_id=conversation_id)
+                    yield f"data: {json.dumps({'type': 'status', 'content': 'Validating the animation'})}\n\n"
+                    yield f"data: {json.dumps({'type': 'animation', 'data': animation_data})}\n\n"
                     yield f"data: {json.dumps({'type': 'status', 'content': ''})}\n\n"
-
-                    # Track animation cost
-                    tracker = get_tracker()
-                    session_usage = tracker.get_session_summary(conversation_id)
-                    if session_usage:
-                        yield f"data: {json.dumps({'type': 'cost', 'data': session_usage})}\n\n"
-                except Exception as e:
-                    logger.warning(f"Animation generation failed: {e}")
+                except Exception as exc:
+                    logger.warning("Animation generation failed: %s", exc)
+                    yield f"data: {json.dumps({'type': 'animation_error', 'content': str(exc)})}\n\n"
                     yield f"data: {json.dumps({'type': 'status', 'content': ''})}\n\n"
 
             # Generate TTS if non-English
@@ -228,13 +240,13 @@ async def generate_visual(
     """Generate animation on-demand for a chat message."""
     from backend.agents.visual_generator import generate_chat_visual
 
-    js_code = await generate_chat_visual(topic, description, conversation_id)
+    animation = await generate_chat_visual(topic, description, conversation_id)
 
     tracker = get_tracker()
     session_usage = tracker.get_session_summary(conversation_id) if conversation_id else None
 
     return {
-        "animation": {"type": "js_scene", "code": js_code},
+        "animation": animation,
         "cost": session_usage,
     }
 

@@ -15,6 +15,39 @@ export type UsageSummary = {
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "")
 
+export type AnimationData = { type: "js_scene"; code: string; topic: string; caption: string; duration: number; plan?: { title?: string } }
+export type ChatEvent =
+  | { type: "text"; content: string }
+  | { type: "status"; content: string }
+  | { type: "animation"; data: AnimationData }
+  | { type: "animation_error" | "error"; content: string }
+  | { type: "cost"; data: UsageSummary }
+  | { type: "done"; conversation_id: string }
+
+export async function streamChat(input: { message: string; conversationId?: string; file?: File; signal?: AbortSignal; onEvent: (event: ChatEvent) => void }) {
+  const body = new FormData()
+  body.set("message", input.message)
+  body.set("conversation_id", input.conversationId ?? "")
+  body.set("language", "en-IN")
+  if (input.file) body.set("file", input.file)
+  const response = await fetch(`${API_URL}/api/chat`, { method: "POST", body, signal: input.signal })
+  if (!response.ok || !response.body) throw new Error(`Athena backend unavailable (${response.status})`)
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+  while (true) {
+    const { value, done } = await reader.read()
+    buffer += decoder.decode(value, { stream: !done })
+    const frames = buffer.split("\n\n")
+    buffer = frames.pop() ?? ""
+    for (const frame of frames) {
+      const line = frame.split("\n").find((item) => item.startsWith("data: "))
+      if (line) input.onEvent(JSON.parse(line.slice(6)) as ChatEvent)
+    }
+    if (done) break
+  }
+}
+
 export async function getBackendHealth(): Promise<BackendHealth> {
   const response = await fetch(`${API_URL}/health`, { cache: "no-store" })
   if (!response.ok) throw new Error(`Backend unavailable (${response.status})`)

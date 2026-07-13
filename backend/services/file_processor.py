@@ -78,6 +78,34 @@ def extract_from_text(file_path: str) -> list[dict]:
     return [{"type": "text", "content": content, "page": 1}]
 
 
+def extract_from_docx(file_path: str) -> list[dict]:
+    """Extract paragraphs and tables from a modern Word document."""
+    from docx import Document
+    document = Document(file_path)
+    blocks: list[dict] = []
+    for index, paragraph in enumerate(document.paragraphs, 1):
+        text = paragraph.text.strip()
+        if text:
+            blocks.append({"type": "text", "content": text, "section": f"Paragraph {index}"})
+    for table_index, table in enumerate(document.tables, 1):
+        rows = [" | ".join(cell.text.strip() for cell in row.cells) for row in table.rows]
+        if any(rows):
+            blocks.append({"type": "text", "content": "\n".join(rows), "section": f"Table {table_index}"})
+    return blocks
+
+
+def extract_from_pptx(file_path: str) -> list[dict]:
+    """Extract text from PowerPoint slides while retaining slide numbers."""
+    from pptx import Presentation
+    presentation = Presentation(file_path)
+    blocks: list[dict] = []
+    for slide_number, slide in enumerate(presentation.slides, 1):
+        texts = [shape.text.strip() for shape in slide.shapes if hasattr(shape, "text") and shape.text.strip()]
+        if texts:
+            blocks.append({"type": "text", "content": "\n".join(texts), "page": slide_number, "section": f"Slide {slide_number}"})
+    return blocks
+
+
 def extract_content(file_path: str, file_type: str) -> list[dict]:
     """
     Route extraction based on file type.
@@ -85,13 +113,19 @@ def extract_content(file_path: str, file_type: str) -> list[dict]:
     """
     ext = file_type.lower()
 
-    if ext == "pdf" or file_path.endswith(".pdf"):
-        return extract_from_pdf(file_path)
-    elif ext in ("txt", "text", "md", "markdown"):
+    suffix = Path(file_path).suffix.lower().lstrip(".")
+    ext = suffix or ext.lstrip(".")
+    if ext == "pdf":
+        blocks = extract_from_pdf(file_path)
+        if not any(block.get("type") == "text" and block.get("content", "").strip() for block in blocks):
+            raise ValueError("This PDF contains no extractable text. Scanned PDFs require OCR, which is not configured.")
+        return blocks
+    if ext in ("txt", "text", "md", "markdown"):
         return extract_from_text(file_path)
-    else:
-        # Try reading as text
-        try:
-            return extract_from_text(file_path)
-        except Exception:
-            return [{"type": "text", "content": f"[Unsupported file type: {ext}]", "page": 1}]
+    if ext == "docx":
+        return extract_from_docx(file_path)
+    if ext == "pptx":
+        return extract_from_pptx(file_path)
+    if ext == "doc":
+        raise ValueError("Legacy .doc files are not supported. Convert the file to .docx and upload it again.")
+    raise ValueError(f"Unsupported file type: .{ext}. Use PDF, TXT, MD, DOCX, or PPTX.")

@@ -143,13 +143,22 @@ def _sanitize(code: str) -> str:
     return code
 
 
+def _validation_error(code: str) -> str | None:
+    lowered = code.lower()
+    forbidden = ["import ", "from ", "def ", "class ", "self.", "manim", "numpy", "fetch(", "xmlhttprequest", "websocket", "localstorage", "sessionstorage", "document.cookie", "window.parent", "window.top", "eval("]
+    match = next((item for item in forbidden if item in lowered), None)
+    if match:
+        return f"Forbidden API or syntax: {match.strip()}"
+    good = ["ctx.", "rc.", "setTimeout", "fillText", "anime(", "gsap.", "requestAnimationFrame"]
+    if not any(item in code for item in good):
+        return "The program does not draw or animate anything"
+    if len(code) < 180:
+        return "The program is too short to be a meaningful scene"
+    return None
+
+
 def _is_js(code: str) -> bool:
-    bad = ["import ", "from ", "def ", "class ", "self.", "manim", "numpy"]
-    for b in bad:
-        if b in code.lower():
-            return False
-    good = ["ctx.", "rc.", "setTimeout", "fillText", "fillStyle", "anime(", "gsap.", "rc.line", "rc.circle", "rc.rectangle"]
-    return any(g in code for g in good)
+    return _validation_error(code) is None
 
 
 def _fallback(topic: str = "") -> str:
@@ -202,41 +211,23 @@ async def generate_step_visual(ctx: AgentContext, step: LessonStep) -> str:
         return _fallback(ctx.topic)
 
 
-async def generate_chat_visual(topic: str, description: str, session_id: str = "") -> str:
-    messages = [
-        {"role": "system", "content": VISUAL_SYSTEM_PROMPT},
-        {"role": "user", "content": (
-            f"Create a rich, animated educational scene for:\n"
-            f"Topic: {topic}\n"
-            f"Context: {description[:500]}\n\n"
-            f"Use rough.js for hand-drawn shapes, setTimeout for staggered reveals, "
-            f"anime.js for animated counters, and fill the ENTIRE canvas (1600x900)."
-        )},
-    ]
-
+async def generate_chat_visual(topic: str, description: str, session_id: str = "") -> dict:
+    """Plan, code, and validate a topic-specific canvas animation."""
+    plan_prompt = [{"role": "system", "content": "You are an animation director. Return compact JSON only with title, caption, duration (8-20 seconds), visual_style, and 3-5 timed beats containing action, objects, camera, and narration."}, {"role": "user", "content": f"Exact student request: {topic}\nTeaching context: {description[:900]}"}]
+    plan_raw = await llm_chat(messages=plan_prompt, model="google/gemini-2.5-flash", temperature=0.35, max_tokens=900, agent="visual_planner", session_id=session_id)
+    cleaned_plan = re.sub(r"^```json\s*|\s*```$", "", plan_raw.strip(), flags=re.IGNORECASE)
     try:
-        code = await llm_chat(messages=messages, model="google/gemini-2.5-flash",
-                             temperature=0.5, max_tokens=2000,
-                             agent="visual_generator", session_id=session_id)
-        program = _sanitize(code)
-        if _is_js(program):
-            return program
+        plan = json.loads(cleaned_plan)
+    except json.JSONDecodeError as exc:
+        raise ValueError("The animation storyboard could not be parsed") from exc
 
-        # Retry with explicit JS-only instruction
-        retry = messages + [{"role": "user", "content": (
-            "Your previous output was NOT browser JavaScript. "
-            "Output ONLY raw JavaScript statements using ctx, rc, anime, gsap. "
-            "NOT Python. NOT manim. Example:\n"
-            'ctx.font = "bold 52px Inter, sans-serif"; ctx.fillStyle = "#ffffff";\n'
-            'ctx.fillText("Title", 80, 70);\n'
-            'rc.line(80, 88, 400, 88, { stroke: "#14b8a6", strokeWidth: 3 });\n'
-            'rc.circle(400, 400, 200, { fill: "#d9770640", stroke: "#d97706" });'
-        )}]
-        code2 = await llm_chat(messages=retry, model="google/gemini-2.5-flash",
-                              temperature=0.4, max_tokens=2000,
-                              agent="visual_generator", session_id=session_id)
-        program2 = _sanitize(code2)
-        return program2 if _is_js(program2) else _fallback(topic)
-    except Exception as e:
-        logger.warning(f"Chat visual failed: {e}")
-        return _fallback(topic)
+    messages = [{"role": "system", "content": VISUAL_SYSTEM_PROMPT}, {"role": "user", "content": f"Exact request: {topic}\nStoryboard JSON: {json.dumps(plan)}\nCreate a topic-specific animated scene. Do not substitute another topic. Use requestAnimationFrame or GSAP for continuous motion and fill the full canvas."}]
+    feedback = ""
+    for attempt in range(2):
+        request = messages if not feedback else messages + [{"role": "user", "content": f"The previous program failed validation: {feedback}. Rewrite it as safe raw JavaScript only."}]
+        code = await llm_chat(messages=request, model="google/gemini-2.5-flash", temperature=0.45, max_tokens=2800, agent="visual_generator", session_id=session_id)
+        program = _sanitize(code)
+        feedback = _validation_error(program) or ""
+        if not feedback:
+            return {"type": "js_scene", "code": program, "plan": plan, "topic": topic, "caption": str(plan.get("caption", description[:220])), "duration": max(8, min(20, int(plan.get("duration", 14))))}
+    raise ValueError(f"Generated animation was unsafe or invalid: {feedback}")

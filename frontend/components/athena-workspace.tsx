@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useRef, useState } from "react"
+import { streamChat, type AnimationData, type UsageSummary } from "@/lib/athena-api"
 import {
   ArrowUp,
   Atom,
@@ -48,6 +49,15 @@ export function AthenaWorkspace() {
   const [generationStep, setGenerationStep] = useState(0)
   const [secondsLeft, setSecondsLeft] = useState(30)
   const [elapsed, setElapsed] = useState(0)
+  const [submittedPrompt, setSubmittedPrompt] = useState("")
+  const [response, setResponse] = useState("")
+  const [status, setStatus] = useState("")
+  const [animation, setAnimation] = useState<AnimationData | null>(null)
+  const [error, setError] = useState("")
+  const [conversationId, setConversationId] = useState("")
+  const [usage, setUsage] = useState<UsageSummary>({})
+  const [attachment, setAttachment] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const generationSteps = [
     "Reading your question",
@@ -57,30 +67,26 @@ export function AthenaWorkspace() {
     "Finishing the animation",
   ]
 
-  useEffect(() => {
-    if (!generating) return
+  const submit = async () => {
+    const prompt = input.trim()
+    if (!prompt || generating) return
     const startedAt = performance.now()
-    const interval = window.setInterval(() => {
-      const nextElapsed = Math.floor((performance.now() - startedAt) / 1000)
-      setElapsed(nextElapsed)
-      setSecondsLeft(Math.max(0, 30 - nextElapsed))
-      setGenerationStep(Math.min(generationSteps.length - 1, Math.floor(nextElapsed / 2)))
-      if (nextElapsed >= 9) {
-        setGenerating(false)
-        window.clearInterval(interval)
-      }
-    }, 250)
-    return () => window.clearInterval(interval)
-  }, [generating, generationSteps.length])
-
-  const submit = () => {
-    if (!input.trim()) return
-    setStarted(true)
-    setGenerating(true)
-    setGenerationStep(0)
-    setSecondsLeft(30)
-    setElapsed(0)
-    setInput("")
+    setStarted(true); setGenerating(true); setSubmittedPrompt(prompt); setResponse(""); setAnimation(null); setError(""); setStatus("Understanding your request"); setElapsed(0); setInput("")
+    try {
+      await streamChat({ message: prompt, conversationId, file: attachment ?? undefined, onEvent: (event) => {
+        setElapsed(Math.floor((performance.now() - startedAt) / 1000))
+        if (event.type === "text") setResponse((value) => value + event.content)
+        if (event.type === "status") setStatus(event.content)
+        if (event.type === "animation") setAnimation(event.data)
+        if (event.type === "animation_error" || event.type === "error") setError(event.content)
+        if (event.type === "cost") setUsage(event.data)
+        if (event.type === "done") setConversationId(event.conversation_id)
+      } })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Athena could not complete this request")
+    } finally {
+      setGenerating(false); setStatus(""); setAttachment(null)
+    }
   }
 
   const SidebarContent = () => (
@@ -126,7 +132,7 @@ export function AthenaWorkspace() {
           <div className="flex min-w-0 items-center gap-2">
             {!sidebar && <button className="icon-button hidden lg:flex" onClick={() => setSidebar(true)} aria-label="Open sidebar"><Menu /></button>}
             <button className="icon-button lg:hidden" onClick={() => setMobileMenu(true)} aria-label="Open navigation"><Menu /></button>
-            <div className="min-w-0"><p className="truncate text-sm font-medium">Photosynthesis, visually</p><p className="hidden text-[11px] text-muted-foreground sm:block">Interactive learning session</p></div>
+            <div className="min-w-0"><p className="truncate text-sm font-medium">{submittedPrompt || "New visual conversation"}</p><p className="hidden text-[11px] text-muted-foreground sm:block">Interactive learning session</p></div>
           </div>
           <div className="flex items-center gap-1.5 md:gap-2">
             <div className="hidden items-center gap-3 rounded-xl border border-border bg-card px-3 py-1.5 lg:flex">
@@ -160,8 +166,8 @@ export function AthenaWorkspace() {
             </div>
           ) : (
             <div className="mx-auto flex max-w-5xl flex-col gap-8 px-3 py-6 md:px-8 md:py-10">
-              <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground">Teach me photosynthesis with a cinematic animation. Take me inside the leaf.</div>
-              <article className="flex max-w-3xl gap-3"><span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full border border-border"><AthenaLogo className="size-4" /></span><div className="flex flex-col gap-4"><div><p className="text-xs font-medium text-muted-foreground">Athena</p><h2 className="mt-2 text-xl font-semibold tracking-tight">Let&apos;s travel inside a leaf.</h2><p className="mt-3 text-sm leading-7 text-muted-foreground">Plants do something extraordinary: they capture light and store it as chemical energy. I&apos;ve built a short visual journey through the chloroplast so you can watch every part of the process unfold.</p></div><div className="flex items-center gap-1"><button className="message-action"><Copy /> Copy</button><button className="message-action"><WandSparkles /> Animate</button></div></div></article>
+              <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground">{submittedPrompt}</div>
+              <article className="flex max-w-3xl gap-3"><span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full border border-border"><AthenaLogo className="size-4" /></span><div className="flex flex-col gap-4"><div><p className="text-xs font-medium text-muted-foreground">Athena</p><h2 className="mt-2 text-xl font-semibold tracking-tight">{generating && !response ? "Understanding your request" : "Here&apos;s the visual explanation."}</h2><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{response || "Athena is preparing a concise explanation before directing the animation."}</p></div><div className="flex items-center gap-1"><button className="message-action"><Copy /> Copy</button><button className="message-action"><WandSparkles /> Animate</button></div></div></article>
               {generating ? (
                 <section className="overflow-hidden rounded-2xl border border-border bg-card">
                   <div className="aspect-video bg-[#f3f2ed] p-5 text-[#121212] md:p-8">
@@ -169,7 +175,7 @@ export function AthenaWorkspace() {
                       <div className="flex items-center justify-between"><span className="rounded-full border border-black/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[.16em]">Creating visual story</span><span className="font-mono text-xs text-black/55">{elapsed}s</span></div>
                       <div className="mx-auto flex max-w-md flex-col items-center gap-5 text-center">
                         <AthenaLoader />
-                        <div><h3 className="text-balance text-xl font-semibold tracking-tight md:text-3xl">{generationSteps[generationStep]}</h3><p className="mt-2 text-sm text-black/55">Designing a smooth, narrated journey through the science.</p></div>
+                        <div><h3 className="text-balance text-xl font-semibold tracking-tight md:text-3xl">{status || generationSteps[generationStep]}</h3><p className="mt-2 text-sm text-black/55">The request is being explained, storyboarded, coded, and safety-checked.</p></div>
                       </div>
                       <div><div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-black/50"><span>Scene {Math.min(3, generationStep + 1)} of 3</span><span>Ready in about {secondsLeft}s</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-[#121212] transition-[width] duration-500" style={{ width: `${Math.min(96, 10 + elapsed * 9)}%` }} /></div></div>
                     </div>
@@ -178,8 +184,8 @@ export function AthenaWorkspace() {
               ) : (
                 <>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground"><Sparkles className="size-4" /><span>Athena created 3 scenes in {Math.max(elapsed, 9)} seconds</span></div>
-                  <AnimationPlayer />
-                  <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4"><div className="metric-card"><span>Model</span><strong>{model}</strong></div><div className="metric-card"><span>Generation</span><strong>{Math.max(elapsed, 9)} seconds</strong></div><div className="metric-card"><span>Duration</span><strong>1m 06s</strong></div><div className="metric-card"><span>Cost</span><strong>$0.004 · ₹0.33</strong></div></div>
+                  {animation ? <AnimationPlayer code={animation.code} topic={animation.topic || submittedPrompt} caption={animation.caption || response} duration={animation.duration} /> : <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-5 text-sm text-destructive">{error || "No animation was returned. Try describing the motion and objects more specifically."}</div>}
+                  <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4"><div className="metric-card"><span>Model</span><strong>{model}</strong></div><div className="metric-card"><span>Generation</span><strong>{elapsed} seconds</strong></div><div className="metric-card"><span>Tokens</span><strong>{usage.total_tokens ?? "—"}</strong></div><div className="metric-card"><span>Cost</span><strong>{usage.total_cost_usd ? `$${usage.total_cost_usd.toFixed(4)}` : "—"}</strong></div></div>
                 </>
               )}
             </div>
@@ -190,7 +196,7 @@ export function AthenaWorkspace() {
           <div className="mx-auto max-w-4xl rounded-2xl border border-border bg-card p-2 shadow-[0_12px_48px_rgba(0,0,0,.12)] focus-within:ring-2 focus-within:ring-ring/30">
             <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { event.preventDefault(); submit() } }} className="max-h-40 min-h-14 w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed outline-none placeholder:text-muted-foreground" placeholder="Ask anything, or describe what you want to see..." />
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1"><button className="composer-button" aria-label="Attach study material"><Paperclip /></button><button className="composer-button" onClick={() => setInput("Animate how a lithium-ion battery stores and releases energy, with a microscopic view") } aria-label="Insert animation stress test"><WandSparkles /></button><span className="hidden items-center gap-1 rounded-lg px-2 text-[11px] text-muted-foreground sm:flex"><FileText className="size-3.5" /> PDF, DOCX, PPTX</span></div>
+              <div className="flex min-w-0 items-center gap-1"><input ref={fileInputRef} type="file" className="sr-only" accept=".pdf,.txt,.md,.docx,.pptx" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /><button className="composer-button" onClick={() => fileInputRef.current?.click()} aria-label="Attach study material"><Paperclip /></button><button className="composer-button" onClick={() => setInput("Animate how a lithium-ion battery stores and releases energy, with a microscopic view") } aria-label="Insert animation stress test"><WandSparkles /></button>{attachment ? <span className="flex min-w-0 items-center gap-1 rounded-lg bg-accent px-2 py-1 text-[11px]"><FileText className="size-3.5 shrink-0" /><span className="max-w-36 truncate">{attachment.name}</span><button onClick={() => setAttachment(null)} aria-label="Remove attachment"><X className="size-3" /></button></span> : <span className="hidden items-center gap-1 rounded-lg px-2 text-[11px] text-muted-foreground sm:flex"><FileText className="size-3.5" /> PDF, DOCX, PPTX</span>}</div>
               <div className="flex items-center gap-2"><span className="hidden items-center gap-1 text-[10px] text-muted-foreground md:flex"><Clock3 className="size-3" /> Visuals usually ready in under 30s</span><button onClick={submit} disabled={!input.trim()} className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-transform hover:scale-[1.03] disabled:opacity-30" aria-label="Send"><ArrowUp /></button></div>
             </div>
           </div>
