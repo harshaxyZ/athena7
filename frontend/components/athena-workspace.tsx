@@ -5,13 +5,10 @@ import { motion } from "framer-motion"
 import { streamChat, type AnimationData, type UsageSummary } from "@/lib/athena-api"
 import {
   ArrowUp,
-  Atom,
-  BookOpen,
   ChevronDown,
   Clock,
   Copy,
   FileText,
-  FlaskConical,
   History,
   Languages,
   Menu,
@@ -23,12 +20,10 @@ import {
   Zap,
   WandSparkles,
   X,
-  Brain,
-  Telescope,
 } from "lucide-react"
 import { AnimationPlayerSync } from "@/components/animation-player-sync"
 import { AnimationSkeleton } from "@/components/animation-skeleton"
-import { AthenaLoader, AthenaLogo } from "@/components/athena-logo"
+import { AthenaLogo } from "@/components/athena-logo"
 
 const chats = [
   { title: "How photosynthesis works", time: "Now" },
@@ -372,49 +367,6 @@ export function AthenaWorkspace() {
                   </motion.div>
                 </motion.div>
               </div>
-            </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-foreground">Athena</p>
-                    <p className="text-sm text-muted-foreground">AI Learning Platform</p>
-                  </div>
-                </div>
-
-                {/* Headline */}
-                <h1 className="text-balance text-4xl font-bold tracking-[-0.04em] leading-[1.1] md:text-6xl">
-                  See ideas come{" "}
-                  <span className="underline decoration-foreground/20 underline-offset-4">
-                    alive.
-                  </span>
-                </h1>
-                <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-                  Ask any question. Upload your textbook. Athena turns complex concepts into
-                  narrated cinematic animations — in seconds.
-                </p>
-
-                {/* Feature pills */}
-                <motion.div
-                  className="flex flex-wrap gap-2"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.18, ease: "easeOut" }}
-                >
-                  {[
-                    { icon: Zap,       text: "S-tier animations" },
-                    { icon: Brain,     text: "Precise narration"  },
-                    { icon: Telescope, text: "Any topic"          },
-                  ].map(({ icon: Icon, text }) => (
-                    <span
-                      key={text}
-                      className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground"
-                    >
-                      <Icon className="size-3.5" />
-                      {text}
-                    </span>
-                  ))}
-                </motion.div>
-              </motion.div>
-
-
             </div>
           ) : (
             /* ── CONVERSATION ────────────────────────────────────── */
