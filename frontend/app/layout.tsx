@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Inter, Geist_Mono } from 'next/font/google'
 import './globals.css'
+import { ThemeProviderWrapper } from '@/components/theme-provider-wrapper'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
@@ -31,7 +32,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background">
       <body className={`${inter.variable} ${geistMono.variable} font-sans antialiased`}>
-        {children}
+        <ThemeProviderWrapper>
+          {children}
+        </ThemeProviderWrapper>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

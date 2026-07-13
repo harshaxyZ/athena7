@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 import { motion } from "framer-motion"
 import { streamChat, type AnimationData, type UsageSummary } from "@/lib/athena-api"
+import { useTheme } from "@/lib/theme-provider"
 import {
   ArrowUp,
   ChevronDown,
@@ -25,12 +26,8 @@ import { AnimationPlayerSync } from "@/components/animation-player-sync"
 import { AnimationSkeleton } from "@/components/animation-skeleton"
 import { AthenaLogo } from "@/components/athena-logo"
 
-const chats = [
-  { title: "How photosynthesis works", time: "Now" },
-  { title: "Fourier transform, visually", time: "2h" },
-  { title: "Inside a lithium-ion battery", time: "Yesterday" },
-  { title: "Why monsoons form", time: "Mon" },
-]
+// Empty chats - fresh start for all users
+const chats: { title: string; time: string }[] = []
 
 
 
@@ -43,9 +40,10 @@ const generationSteps = [
 ]
 
 export function AthenaWorkspace() {
+  const { theme, setTheme } = useTheme()
   const [sidebar, setSidebar] = useState(true)
   const [mobileMenu, setMobileMenu] = useState(false)
-  const [model, setModel] = useState("Claude Sonnet 4.6")
+  const [settings, setSettings] = useState(false)
   const [input, setInput] = useState("")
   const [started, setStarted] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -256,20 +254,63 @@ export function AthenaWorkspace() {
               </div>
             )}
 
-            <label className="relative">
-              <span className="sr-only">Choose model</span>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="h-9 appearance-none rounded-xl border border-border bg-card pl-3 pr-8 text-xs font-semibold outline-none transition-all hover:bg-accent focus:ring-2 focus:ring-ring/40"
-              >
-                <option>Claude Sonnet 4.6</option>
-                <option>Qwen 3.6 Flash</option>
-                <option>Claude Opus 4.8</option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            </label>
+            <button
+              onClick={() => setSettings(!settings)}
+              className="icon-button relative"
+              aria-label="Settings"
+            >
+              <Settings />
+              {settings && <span className="absolute inset-0 rounded-xl border border-foreground/20" />}
+            </button>
           </div>
+
+          {/* Settings panel */}
+          {settings && (
+            <div className="absolute right-3 top-14 z-50 w-72 rounded-2xl border border-border bg-card p-4 shadow-2xl">
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Appearance</p>
+                  <div className="flex items-center gap-2 rounded-xl border border-border bg-accent p-1">
+                    <button
+                      onClick={() => setTheme("light")}
+                      className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
+                        theme === "light"
+                          ? "bg-background text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Light
+                    </button>
+                    <button
+                      onClick={() => setTheme("dark")}
+                      className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
+                        theme === "dark"
+                          ? "bg-background text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Dark
+                    </button>
+                  </div>
+                </div>
+                <div className="border-t border-border pt-3">
+                  <button
+                    onClick={() => {
+                      setStarted(false)
+                      setResponse("")
+                      setAnimationParts([])
+                      setCurrentPartIndex(0)
+                      setError("")
+                      setSettings(false)
+                    }}
+                    className="w-full rounded-lg bg-accent/50 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+                  >
+                    Reset conversation
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </header>
 
         {/* Content scroll area */}
@@ -326,7 +367,7 @@ export function AthenaWorkspace() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2, duration: 0.6 }}
                   >
-                    Upload documents. Ask questions. Watch concepts transform into stunning cinematic explanations in seconds. Powered by Claude Sonnet 4.6.
+                    Upload documents. Ask questions. Watch concepts transform into stunning cinematic explanations in seconds.
                   </motion.p>
 
                   {/* Stats/features grid */}
@@ -466,7 +507,6 @@ export function AthenaWorkspace() {
                       <span className="text-xs font-semibold text-foreground">
                         {animationParts.length} scene{animationParts.length > 1 ? "s" : ""} generated in {Math.max(elapsed, 7)}s
                       </span>
-                      <span className="ml-auto text-xs text-muted-foreground">Claude Sonnet 4.6</span>
                     </div>
                   )}
 
@@ -508,11 +548,7 @@ export function AthenaWorkspace() {
                       )}
 
                       {/* Cost + time metrics */}
-                      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                        <div className="metric-card">
-                          <span>Animation engine</span>
-                          <strong>Claude Sonnet 4.6</strong>
-                        </div>
+                      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                         <div className="metric-card">
                           <span>Generation time</span>
                           <strong>{elapsed}s</strong>
