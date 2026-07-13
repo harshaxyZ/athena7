@@ -247,7 +247,7 @@ async def generate_chat_visual(topic: str, description: str, session_id: str = "
     feedback = ""
     for attempt in range(2):
         request = messages if not feedback else messages + [{"role": "user", "content": f"The previous program failed validation: {feedback}. Rewrite it as safe raw JavaScript only."}]
-        code = await llm_chat(messages=request, model="anthropic/claude-fable-5", temperature=0.45, max_tokens=3200, agent="visual_generator", session_id=session_id)
+        code = await llm_chat(messages=request, model="anthropic/claude-sonnet-4-6", temperature=0.45, max_tokens=3200, agent="visual_generator", session_id=session_id)
         program = _sanitize(code)
         feedback = _validation_error(program) or ""
         if not feedback:

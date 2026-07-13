@@ -1,13 +1,14 @@
 "use client"
 
 import { useRef, useState } from "react"
+import { motion } from "framer-motion"
 import { streamChat, type AnimationData, type UsageSummary } from "@/lib/athena-api"
 import {
   ArrowUp,
   Atom,
   BookOpen,
   ChevronDown,
-  Clock3,
+  Clock,
   Copy,
   FileText,
   FlaskConical,
@@ -17,11 +18,13 @@ import {
   MessageSquarePlus,
   Paperclip,
   PanelLeftClose,
-  Search,
-  Settings,
   Sparkles,
+  Settings,
+  Zap,
   WandSparkles,
   X,
+  Brain,
+  Telescope,
 } from "lucide-react"
 import { AnimationPlayer } from "@/components/animation-player"
 import { AnimationPlayerSync } from "@/components/animation-player-sync"
@@ -36,25 +39,31 @@ const chats = [
 ]
 
 const prompts = [
-  { icon: Atom, label: "Quantum entanglement", detail: "Follow two particles across space" },
-  { icon: FlaskConical, label: "CRISPR gene editing", detail: "Step inside a living cell" },
-  { icon: BookOpen, label: "The Indian monsoon", detail: "Fly with the seasonal winds" },
+  { icon: Atom, label: "Quantum entanglement", detail: "Follow two particles across space", color: "text-violet-400", bg: "bg-violet-500/10 group-hover:bg-violet-500/20" },
+  { icon: FlaskConical, label: "CRISPR gene editing", detail: "Step inside a living cell", color: "text-emerald-400", bg: "bg-emerald-500/10 group-hover:bg-emerald-500/20" },
+  { icon: BookOpen, label: "The Indian monsoon", detail: "Fly with the seasonal winds", color: "text-sky-400", bg: "bg-sky-500/10 group-hover:bg-sky-500/20" },
+]
+
+const generationSteps = [
+  "Reading your question",
+  "Planning the visual story",
+  "Choreographing animations",
+  "Synchronising narration",
+  "Finalising the scene",
 ]
 
 export function AthenaWorkspace() {
   const [sidebar, setSidebar] = useState(true)
   const [mobileMenu, setMobileMenu] = useState(false)
-  const [model, setModel] = useState("GLM 5.2")
+  const [model, setModel] = useState("Claude Sonnet 4.6")
   const [input, setInput] = useState("")
   const [started, setStarted] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [generationStep, setGenerationStep] = useState(0)
-  const [secondsLeft, setSecondsLeft] = useState(30)
   const [elapsed, setElapsed] = useState(0)
   const [submittedPrompt, setSubmittedPrompt] = useState("")
   const [response, setResponse] = useState("")
   const [status, setStatus] = useState("")
-  const [animation, setAnimation] = useState<AnimationData | null>(null)
   const [animationParts, setAnimationParts] = useState<AnimationData[]>([])
   const [currentPartIndex, setCurrentPartIndex] = useState(0)
   const [waitingForNextPart, setWaitingForNextPart] = useState(false)
@@ -63,132 +72,348 @@ export function AthenaWorkspace() {
   const [usage, setUsage] = useState<UsageSummary>({})
   const [attachment, setAttachment] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const generationSteps = [
-    "Reading your question",
-    "Planning the visual story",
-    "Building scene 1 of 3",
-    "Synchronizing narration",
-    "Finishing the animation",
-  ]
+  const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const submit = async () => {
     const prompt = input.trim()
     if (!prompt || generating) return
     const startedAt = performance.now()
-    setStarted(true); setGenerating(true); setSubmittedPrompt(prompt); setResponse(""); setAnimation(null); setError(""); setStatus("Understanding your request"); setElapsed(0); setInput("")
+    setStarted(true)
+    setGenerating(true)
+    setSubmittedPrompt(prompt)
+    setResponse("")
+    setAnimationParts([])
+    setCurrentPartIndex(0)
+    setError("")
+    setStatus("Understanding your request")
+    setElapsed(0)
+    setInput("")
+    setGenerationStep(0)
+
+    // Advance generation step every 6s for perceived progress
+    let step = 0
+    stepTimerRef.current = setInterval(() => {
+      step = Math.min(step + 1, generationSteps.length - 1)
+      setGenerationStep(step)
+    }, 6000)
+
     try {
-      await streamChat({ message: prompt, conversationId, file: attachment ?? undefined, onEvent: (event) => {
-        setElapsed(Math.floor((performance.now() - startedAt) / 1000))
-        if (event.type === "text") setResponse((value) => value + event.content)
-        if (event.type === "status") setStatus(event.content)
-        if (event.type === "animation") {
-          setAnimation(event.data)
-          setAnimationParts([event.data])
-          setCurrentPartIndex(0)
-        }
-        if (event.type === "animation_part") {
-          setAnimationParts((prev) => [...prev, event.data])
-          setWaitingForNextPart(false)
-        }
-        if (event.type === "animation_error" || event.type === "error") setError(event.content)
-        if (event.type === "cost") setUsage(event.data)
-        if (event.type === "done") setConversationId(event.conversation_id)
-      } })
+      await streamChat({
+        message: prompt,
+        conversationId,
+        file: attachment ?? undefined,
+        onEvent: (event) => {
+          setElapsed(Math.floor((performance.now() - startedAt) / 1000))
+          if (event.type === "text") setResponse((v) => v + event.content)
+          if (event.type === "status") setStatus(event.content)
+          if (event.type === "animation") {
+            setAnimationParts([event.data])
+            setCurrentPartIndex(0)
+          }
+          if (event.type === "animation_part") {
+            setAnimationParts((prev) => [...prev, event.data])
+            setWaitingForNextPart(false)
+          }
+          if (event.type === "animation_error" || event.type === "error") setError(event.content)
+          if (event.type === "cost") setUsage(event.data)
+          if (event.type === "done") setConversationId(event.conversation_id)
+        },
+      })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Athena could not complete this request")
     } finally {
-      setGenerating(false); setStatus(""); setAttachment(null)
+      setGenerating(false)
+      setStatus("")
+      setAttachment(null)
+      if (stepTimerRef.current) clearInterval(stepTimerRef.current)
     }
   }
+
+  const costInr = usage.total_cost_usd ? (usage.total_cost_usd * 84).toFixed(2) : null
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col bg-sidebar p-3 text-sidebar-foreground">
       <div className="flex items-center justify-between px-1 py-1">
-        <div className="flex items-center gap-2.5"><AthenaLogo /><span className="text-sm font-semibold tracking-tight">Athena</span></div>
-        <button className="icon-button" onClick={() => { setSidebar(false); setMobileMenu(false) }} aria-label="Close sidebar"><PanelLeftClose /></button>
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-8 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+            <AthenaLogo className="size-5" />
+          </div>
+          <span className="bg-gradient-to-r from-foreground to-primary bg-clip-text text-sm font-bold tracking-tight text-transparent">
+            Athena
+          </span>
+        </div>
+        <button
+          className="icon-button"
+          onClick={() => { setSidebar(false); setMobileMenu(false) }}
+          aria-label="Close sidebar"
+        >
+          <PanelLeftClose />
+        </button>
       </div>
-      <button className="mt-4 flex w-full items-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground transition-transform active:scale-[.98]">
-        <MessageSquarePlus /> New conversation
+
+      <button
+        onClick={() => { setStarted(false); setResponse(""); setAnimationParts([]); setError("") }}
+        className="mt-4 flex w-full items-center gap-2.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_4px_20px_rgba(124,92,252,0.35)] transition-all duration-200 hover:shadow-[0_4px_28px_rgba(124,92,252,0.55)] hover:scale-[1.01] active:scale-[0.99]"
+      >
+        <MessageSquarePlus className="size-4" /> New conversation
       </button>
-      <div className="mt-5 flex items-center justify-between px-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recent</p>
-        <button className="text-muted-foreground hover:text-foreground" aria-label="Search chats"><Search className="size-4" /></button>
+
+      <div className="mt-5 flex items-center justify-between px-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Recent</p>
       </div>
-      <nav className="mt-2 flex flex-col gap-1">
-        {chats.map((chat, index) => (
-          <button key={chat.title} className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${index === 0 ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"}`}>
-            <History className="size-4 shrink-0" />
+
+      <nav className="mt-2 flex flex-col gap-0.5">
+        {chats.map((chat, i) => (
+          <button
+            key={chat.title}
+            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150 ${
+              i === 0
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            }`}
+          >
+            <History className="size-4 shrink-0 opacity-60" />
             <span className="min-w-0 flex-1 truncate text-sm">{chat.title}</span>
-            <span className="text-[10px] opacity-50">{chat.time}</span>
+            <span className="text-[10px] opacity-40">{chat.time}</span>
           </button>
         ))}
       </nav>
-      <div className="mt-auto flex flex-col gap-1 border-t border-sidebar-border pt-3">
-        <button className="sidebar-link"><Languages /> Languages <span className="ml-auto text-[10px] text-muted-foreground">EN</span></button>
-        <button className="sidebar-link"><Settings /> Settings</button>
-        <button className="mt-2 flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-sidebar-accent">
-          <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">H</span>
-          <span className="text-left"><span className="block text-sm font-medium">Harsh</span><span className="block text-[11px] text-muted-foreground">Learning workspace</span></span>
-        </button>
+
+      <div className="mt-auto flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
+        <button className="sidebar-link"><Languages className="size-4" /> Languages <span className="ml-auto text-[10px]">EN</span></button>
+        <button className="sidebar-link"><Settings className="size-4" /> Settings</button>
+        <div className="mt-2 flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-sidebar-accent">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-[0_2px_10px_rgba(124,92,252,0.4)]">A</span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold">Student</span>
+            <span className="block text-[11px] text-muted-foreground">Learning workspace</span>
+          </span>
+        </div>
       </div>
     </div>
   )
 
   return (
     <main className="flex h-dvh overflow-hidden bg-background text-foreground">
-      {sidebar && <aside className="hidden w-64 shrink-0 border-r border-sidebar-border lg:block"><SidebarContent /></aside>}
-      {mobileMenu && <><button className="fixed inset-0 z-40 bg-foreground/30 lg:hidden" onClick={() => setMobileMenu(false)} aria-label="Close navigation" /><aside className="fixed inset-y-0 left-0 z-50 w-[min(84vw,20rem)] border-r border-sidebar-border lg:hidden"><SidebarContent /></aside></>}
+      {/* Sidebar */}
+      {sidebar && (
+        <aside className="hidden w-64 shrink-0 border-r border-sidebar-border lg:block">
+          <SidebarContent />
+        </aside>
+      )}
+      {mobileMenu && (
+        <>
+          <button
+            className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden"
+            onClick={() => setMobileMenu(false)}
+            aria-label="Close navigation"
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 w-[min(84vw,20rem)] border-r border-sidebar-border bg-sidebar lg:hidden">
+            <SidebarContent />
+          </aside>
+        </>
+      )}
 
+      {/* Main area */}
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3 md:px-5">
+        {/* Header */}
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3 backdrop-blur-sm md:px-5">
           <div className="flex min-w-0 items-center gap-2">
-            {!sidebar && <button className="icon-button hidden lg:flex" onClick={() => setSidebar(true)} aria-label="Open sidebar"><Menu /></button>}
-            <button className="icon-button lg:hidden" onClick={() => setMobileMenu(true)} aria-label="Open navigation"><Menu /></button>
-            <div className="min-w-0"><p className="truncate text-sm font-medium">{submittedPrompt || "New visual conversation"}</p><p className="hidden text-[11px] text-muted-foreground sm:block">Interactive learning session</p></div>
-          </div>
-          <div className="flex items-center gap-1.5 md:gap-2">
-            <div className="hidden items-center gap-3 rounded-xl border border-border bg-card px-3 py-1.5 lg:flex">
-              <div><p className="text-[9px] uppercase tracking-wider text-muted-foreground">Tokens</p><p className="font-mono text-xs">2,482</p></div>
-              <div className="h-5 w-px bg-border" />
-              <div><p className="text-[9px] uppercase tracking-wider text-muted-foreground">Cost</p><p className="font-mono text-xs">$0.004 · ₹0.33</p></div>
-              <div className="h-5 w-px bg-border" />
-              <div><p className="text-[9px] uppercase tracking-wider text-muted-foreground">Render</p><p className="font-mono text-xs">18s / min</p></div>
+            {!sidebar && (
+              <button className="icon-button hidden lg:flex" onClick={() => setSidebar(true)} aria-label="Open sidebar">
+                <Menu />
+              </button>
+            )}
+            <button className="icon-button lg:hidden" onClick={() => setMobileMenu(true)} aria-label="Open navigation">
+              <Menu />
+            </button>
+            {!sidebar && (
+              <div className="ml-1 flex items-center gap-2 text-muted-foreground/60">
+                <AthenaLogo className="size-5" />
+                <span className="hidden text-sm font-semibold text-foreground sm:block">Athena</span>
+              </div>
+            )}
+            <div className="min-w-0 ml-1">
+              <p className="truncate text-sm font-semibold">
+                {submittedPrompt || "New visual conversation"}
+              </p>
+              <p className="hidden text-[11px] text-muted-foreground sm:block">
+                Interactive learning session
+              </p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Live stats */}
+            {(usage.total_tokens || elapsed > 0) && (
+              <div className="hidden items-center gap-3 rounded-xl border border-border bg-card px-3 py-1.5 lg:flex">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tokens</p>
+                  <p className="font-mono text-xs font-semibold">{usage.total_tokens?.toLocaleString() ?? "—"}</p>
+                </div>
+                <div className="h-4 w-px bg-border" />
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Cost</p>
+                  <p className="font-mono text-xs font-semibold">{costInr ? `₹${costInr}` : "—"}</p>
+                </div>
+                <div className="h-4 w-px bg-border" />
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Time</p>
+                  <p className="font-mono text-xs font-semibold">{elapsed}s</p>
+                </div>
+              </div>
+            )}
+
             <label className="relative">
               <span className="sr-only">Choose model</span>
-              <select value={model} onChange={(event) => setModel(event.target.value)} className="h-9 appearance-none rounded-xl border border-border bg-card pl-3 pr-8 text-xs font-medium outline-none transition-colors hover:bg-accent focus:ring-2 focus:ring-ring">
-                <option>GLM 5.2</option><option>Gemini 2.5 Flash</option><option>Mistral Small 3.1</option>
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="h-9 appearance-none rounded-xl border border-border bg-card pl-3 pr-8 text-xs font-semibold outline-none transition-all hover:bg-accent hover:border-primary/30 focus:ring-2 focus:ring-ring/40"
+              >
+                <option>Claude Sonnet 4.6</option>
+                <option>Qwen 3.6 Flash</option>
+                <option>Claude Opus 4.8</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             </label>
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* Content */}
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
           {!started ? (
-            <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-4 py-10 md:px-8">
-              <div className="mb-8 flex max-w-2xl flex-col gap-4">
-                <span className="flex size-12 items-center justify-center rounded-2xl border border-border bg-card shadow-sm"><AthenaLogo /></span>
-                <div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Learn beyond words</p><h1 className="max-w-2xl text-balance text-3xl font-semibold tracking-[-0.04em] md:text-5xl">See difficult ideas come alive.</h1></div>
-                <p className="max-w-xl text-pretty text-sm leading-relaxed text-muted-foreground md:text-base">Ask a question or share your study material. Athena turns explanations into narrated, interactive visual stories.</p>
-              </div>
-              <div className="grid gap-2 md:grid-cols-3">
-                {prompts.map(({ icon: Icon, label, detail }) => <button key={label} onClick={() => setInput(`Teach me ${label.toLowerCase()} with a cinematic animation`)} className="group flex items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-lg"><span className="rounded-xl bg-accent p-2"><Icon className="size-4" /></span><span><span className="block text-sm font-medium">{label}</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{detail}</span></span></button>)}
+            /* ─── LANDING ─────────────────────────────────────────── */
+            <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-4 py-12 md:px-8">
+              {/* Hero */}
+              <motion.div
+                className="mb-10 flex max-w-3xl flex-col gap-5"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="glow-pulse flex size-14 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/25">
+                    <AthenaLogo className="size-8" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-primary">Athena · AI Learning</p>
+                    <p className="text-sm text-muted-foreground">Powered by Claude Sonnet 4.6</p>
+                  </div>
+                </div>
+
+                <h1 className="text-balance text-4xl font-bold tracking-[-0.04em] leading-[1.1] md:text-6xl">
+                  See ideas come{" "}
+                  <span className="bg-gradient-to-r from-primary via-violet-400 to-primary bg-clip-text text-transparent">
+                    alive.
+                  </span>
+                </h1>
+                <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
+                  Ask any question. Upload your textbook. Athena turns complex concepts into
+                  narrated, cinematic animations — in seconds.
+                </p>
+
+                {/* Feature pills */}
+                <motion.div
+                  className="flex flex-wrap gap-2"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.18, ease: "easeOut" }}
+                >
+                  {[
+                    { icon: Zap, text: "S-tier animations" },
+                    { icon: Brain, text: "Precise narration" },
+                    { icon: Telescope, text: "Any topic" },
+                  ].map(({ icon: Icon, text }) => (
+                    <span key={text} className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                      <Icon className="size-3.5 text-primary" />
+                      {text}
+                    </span>
+                  ))}
+                </motion.div>
+              </motion.div>
+
+              {/* Prompt chips */}
+              <div className="grid gap-3 md:grid-cols-3">
+                {prompts.map(({ icon: Icon, label, detail, color, bg }, i) => (
+                  <motion.button
+                    key={label}
+                    onClick={() => setInput(`Teach me ${label.toLowerCase()} with a cinematic animation`)}
+                    className="prompt-chip group"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.28 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <span className={`rounded-xl p-2.5 transition-colors duration-300 ${bg}`}>
+                      <Icon className={`size-5 ${color}`} />
+                    </span>
+                    <span className="min-w-0 text-left">
+                      <span className="block text-sm font-semibold leading-snug">{label}</span>
+                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{detail}</span>
+                    </span>
+                  </motion.button>
+                ))}
               </div>
             </div>
           ) : (
-            <div className="mx-auto flex max-w-5xl flex-col gap-8 px-3 py-6 md:px-8 md:py-10">
-              <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground">{submittedPrompt}</div>
-              <article className="flex max-w-3xl gap-3"><span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full border border-border"><AthenaLogo className="size-4" /></span><div className="flex flex-col gap-4"><div><p className="text-xs font-medium text-muted-foreground">Athena</p><h2 className="mt-2 text-xl font-semibold tracking-tight">{generating && !response ? "Understanding your request" : "Here&apos;s the visual explanation."}</h2><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{response || "Athena is preparing a concise explanation before directing the animation."}</p></div><div className="flex items-center gap-1"><button className="message-action"><Copy /> Copy</button><button className="message-action"><WandSparkles /> Animate</button></div></div></article>
+            /* ─── CONVERSATION ────────────────────────────────────── */
+            <div className="mx-auto flex max-w-4xl flex-col gap-8 px-3 py-8 md:px-8 md:py-10">
+              {/* User message */}
+              <div className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-5 py-3.5 text-sm font-medium leading-relaxed text-primary-foreground shadow-[0_4px_20px_rgba(124,92,252,0.3)]">
+                  {submittedPrompt}
+                </div>
+              </div>
+
+              {/* Athena response */}
+              <article className="flex max-w-3xl gap-3">
+                <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+                  <AthenaLogo className="size-4" />
+                </div>
+                <div className="flex flex-col gap-4 min-w-0">
+                  <div>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-widest text-primary">Athena</p>
+                    <h2 className="text-xl font-bold tracking-tight">
+                      {generating && !response ? (
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          {status || generationSteps[generationStep]}
+                          <span className="cursor" aria-hidden="true" />
+                        </span>
+                      ) : (
+                        "Here&apos;s your visual explanation."
+                      )}
+                    </h2>
+                    {response && (
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
+                        {response}
+                      </p>
+                    )}
+                    {!response && !generating && (
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        Preparing a precise explanation before directing the animation.
+                      </p>
+                    )}
+                  </div>
+                  {response && (
+                    <div className="flex items-center gap-1">
+                      <button className="message-action"><Copy className="size-3.5" /> Copy</button>
+                      <button className="message-action" onClick={submit}><WandSparkles className="size-3.5" /> Animate again</button>
+                    </div>
+                  )}
+                </div>
+              </article>
+
+              {/* Animation area */}
               {generating ? (
                 <>
                   {animationParts.length > 0 ? (
                     <section className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-primary">
                           <Sparkles className="size-4" />
-                          <span>Playing part 1 of {animationParts[0]?.total_parts || 1}</span>
+                          <span>Part 1 of {animationParts[0]?.total_parts || 1} ready · Playing now</span>
                         </div>
                         <span className="font-mono text-xs text-muted-foreground">{elapsed}s</span>
                       </div>
@@ -209,11 +434,11 @@ export function AthenaWorkspace() {
                           }
                         }}
                       />
-                      {waitingForNextPart && animationParts[currentPartIndex]?.total_parts && currentPartIndex < animationParts[currentPartIndex]!.total_parts! - 1 && (
+                      {waitingForNextPart && animationParts[currentPartIndex]?.total_parts && currentPartIndex < (animationParts[currentPartIndex]?.total_parts ?? 1) - 1 && (
                         <AnimationSkeleton
-                          part={(currentPartIndex + 2)}
+                          part={currentPartIndex + 2}
                           total_parts={animationParts[currentPartIndex]?.total_parts || 1}
-                          message="Next part is being prepared"
+                          message="Preparing next part in the background"
                         />
                       )}
                     </section>
@@ -221,18 +446,24 @@ export function AthenaWorkspace() {
                     <AnimationSkeleton
                       part={1}
                       total_parts={1}
-                      message={status || generationSteps[generationStep] || "Generating animation..."}
+                      message={status || generationSteps[generationStep]}
                     />
                   )}
                 </>
               ) : (
                 <>
                   {animationParts.length > 0 && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Sparkles className="size-4" />
-                      <span>Athena created {animationParts.length} scene{animationParts.length > 1 ? "s" : ""} in {Math.max(elapsed, 9)} seconds</span>
+                    <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5">
+                      <Sparkles className="size-4 text-primary" />
+                      <span className="text-xs font-semibold text-primary">
+                        Athena generated {animationParts.length} scene{animationParts.length > 1 ? "s" : ""} in {Math.max(elapsed, 7)} seconds
+                      </span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        Claude Sonnet 4.6
+                      </span>
                     </div>
                   )}
+
                   {animationParts.length > 0 ? (
                     <section className="space-y-4">
                       <AnimationPlayerSync
@@ -250,16 +481,17 @@ export function AthenaWorkspace() {
                           }
                         }}
                       />
+
                       {animationParts.length > 1 && (
                         <div className="flex gap-2">
                           {animationParts.map((_, i) => (
                             <button
                               key={i}
                               onClick={() => setCurrentPartIndex(i)}
-                              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-colors ${
+                              className={`flex-1 rounded-xl py-2.5 text-xs font-bold tracking-wide transition-all duration-200 ${
                                 i === currentPartIndex
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                  ? "bg-primary text-primary-foreground shadow-[0_4px_16px_rgba(124,92,252,0.35)]"
+                                  : "bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"
                               }`}
                             >
                               Part {i + 1}
@@ -267,35 +499,115 @@ export function AthenaWorkspace() {
                           ))}
                         </div>
                       )}
+
+                      {/* Cost + time metrics */}
+                      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                        <div className="metric-card">
+                          <span>Animation engine</span>
+                          <strong>Claude Sonnet 4.6</strong>
+                        </div>
+                        <div className="metric-card">
+                          <span>Generation time</span>
+                          <strong>{elapsed}s</strong>
+                        </div>
+                        <div className="metric-card">
+                          <span>Tokens used</span>
+                          <strong>{usage.total_tokens?.toLocaleString() ?? "—"}</strong>
+                        </div>
+                        <div className="metric-card">
+                          <span>Total cost</span>
+                          <strong>{costInr ? `₹${costInr}` : "—"}</strong>
+                        </div>
+                      </div>
                     </section>
-                  ) : (
-                    <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-5 text-sm text-destructive">
-                      {error || "No animation was returned. Try describing the motion and objects more specifically."}
+                  ) : error ? (
+                    <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-5 text-sm text-red-400">
+                      <p className="font-semibold mb-1">Animation failed</p>
+                      <p className="text-red-400/80">{error}</p>
                     </div>
-                  )}
-                  {animationParts.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
-                      <div className="metric-card"><span>Model</span><strong>S-tier</strong></div>
-                      <div className="metric-card"><span>Generation</span><strong>{elapsed} seconds</strong></div>
-                      <div className="metric-card"><span>Tokens</span><strong>{usage.total_tokens ?? "—"}</strong></div>
-                      <div className="metric-card"><span>Cost</span><strong>{usage.total_cost_usd ? `₹${(usage.total_cost_usd * 82).toFixed(2)}` : "—"}</strong></div>
-                    </div>
-                  )}
+                  ) : null}
                 </>
               )}
             </div>
           )}
         </div>
 
-        <footer className="shrink-0 bg-background px-3 pb-3 pt-2 md:px-6 md:pb-5">
-          <div className="mx-auto max-w-4xl rounded-2xl border border-border bg-card p-2 shadow-[0_12px_48px_rgba(0,0,0,.12)] focus-within:ring-2 focus-within:ring-ring/30">
-            <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { event.preventDefault(); submit() } }} className="max-h-40 min-h-14 w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed outline-none placeholder:text-muted-foreground" placeholder="Ask anything, or describe what you want to see..." />
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-1"><input ref={fileInputRef} type="file" className="sr-only" accept=".pdf,.txt,.md,.docx,.pptx" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /><button className="composer-button" onClick={() => fileInputRef.current?.click()} aria-label="Attach study material"><Paperclip /></button><button className="composer-button" onClick={() => setInput("Animate how a lithium-ion battery stores and releases energy, with a microscopic view") } aria-label="Insert animation stress test"><WandSparkles /></button>{attachment ? <span className="flex min-w-0 items-center gap-1 rounded-lg bg-accent px-2 py-1 text-[11px]"><FileText className="size-3.5 shrink-0" /><span className="max-w-36 truncate">{attachment.name}</span><button onClick={() => setAttachment(null)} aria-label="Remove attachment"><X className="size-3" /></button></span> : <span className="hidden items-center gap-1 rounded-lg px-2 text-[11px] text-muted-foreground sm:flex"><FileText className="size-3.5" /> PDF, DOCX, PPTX</span>}</div>
-              <div className="flex items-center gap-2"><span className="hidden items-center gap-1 text-[10px] text-muted-foreground md:flex"><Clock3 className="size-3" /> Visuals usually ready in under 30s</span><button onClick={submit} disabled={!input.trim()} className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-transform hover:scale-[1.03] disabled:opacity-30" aria-label="Send"><ArrowUp /></button></div>
+        {/* Composer */}
+        <footer className="shrink-0 bg-background/80 px-3 pb-3 pt-2 backdrop-blur-sm md:px-6 md:pb-5">
+          <div className="mx-auto max-w-3xl">
+            <div className="rounded-2xl border border-border bg-card shadow-[0_8px_40px_rgba(0,0,0,0.2)] transition-all duration-300 focus-within:border-primary/40 focus-within:shadow-[0_8px_40px_rgba(124,92,252,0.15)]">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+                    e.preventDefault()
+                    submit()
+                  }
+                }}
+                className="max-h-44 min-h-[3.5rem] w-full resize-none bg-transparent px-4 py-3.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/60"
+                placeholder="Ask anything — &ldquo;How does a black hole form?&rdquo; or paste your notes..."
+              />
+              <div className="flex items-center justify-between gap-2 px-2 pb-2">
+                <div className="flex items-center gap-1">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="sr-only"
+                    accept=".pdf,.txt,.md,.docx,.pptx"
+                    onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    className="composer-button"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-label="Attach study material"
+                  >
+                    <Paperclip />
+                  </button>
+                  <button
+                    className="composer-button"
+                    onClick={() => setInput("Animate how a black hole forms and warps spacetime with dramatic effects")}
+                    aria-label="Try an example"
+                  >
+                    <WandSparkles />
+                  </button>
+                  {attachment ? (
+                    <span className="flex min-w-0 items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                      <FileText className="size-3.5 shrink-0" />
+                      <span className="max-w-36 truncate">{attachment.name}</span>
+                      <button onClick={() => setAttachment(null)} aria-label="Remove attachment">
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="hidden items-center gap-1 text-[11px] text-muted-foreground sm:flex">
+                      <FileText className="size-3.5" /> PDF · DOCX · PPTX
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="hidden items-center gap-1 text-[10px] font-medium text-muted-foreground md:flex">
+                    <Clock className="size-3" /> Ready in ~10–30s
+                  </span>
+                  <button
+                    onClick={submit}
+                    disabled={!input.trim() || generating}
+                    className="send-button"
+                    aria-label="Generate animation"
+                  >
+                    {generating ? (
+                      <span className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+                    ) : (
+                      <ArrowUp className="size-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
+            <p className="mt-2 text-center text-[10px] text-muted-foreground/50">
+              Athena can make mistakes. Verify important information.
+            </p>
           </div>
-          <p className="mt-2 text-center text-[10px] text-muted-foreground">Athena can make mistakes. Check important facts.</p>
         </footer>
       </section>
     </main>

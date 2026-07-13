@@ -1,9 +1,25 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  Pause,
+  Play,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+} from "lucide-react"
 import type { AnimationData, Beat } from "@/lib/athena-api"
+
+// Extend Window for sandboxed iframe bridge
+declare global {
+  interface Window {
+    setAnimationTime?: (t: number) => void
+  }
+}
 
 type AnimationPlayerSyncProps = {
   code: string
@@ -35,164 +51,240 @@ export function AnimationPlayerSync({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [currentSubtitle, setCurrentSubtitle] = useState("")
   const [renderKey, setRenderKey] = useState(0)
+  const [speed, setSpeed] = useState(1)
+  const [iframeReady, setIframeReady] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
-  const animationFrameRef = useRef<number>()
+  const animationFrameRef = useRef<number | undefined>(undefined)
+  const startTimeRef = useRef<number>(Date.now() - currentTime * 1000)
 
   const safeCode = code.replace(/<\/script/gi, "<\\/script")
-  const sandboxDocument = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'unsafe-inline';"><style>*{box-sizing:border-box}html,body,#stage{margin:0;width:100%;height:100%;overflow:hidden;background:#10131c}canvas{width:100%;height:100%;display:block}</style></head><body><div id="stage"><canvas id="board" width="1600" height="900"></canvas></div><script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script><script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script><script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script><script src="https://cdn.jsdelivr.net/npm/p5@1.11.8/lib/p5.min.js"></script><script src="https://cdn.jsdelivr.net/npm/fabric@6.7.1/dist/index.min.js"></script><script src="https://cdn.jsdelivr.net/npm/paper@0.12.18/dist/paper-full.min.js"></script><script>window.animationTime=${0};window.setAnimationTime=function(t){window.animationTime=t};const board=document.getElementById('board'),ctx=board.getContext('2d'),stage=document.getElementById('stage'),rc=rough.canvas(board);try{${safeCode}\nparent.postMessage({type:'athena-ready'},'*')}catch(error){ctx.fillStyle='#fff';ctx.font='28px sans-serif';ctx.fillText('Animation error: '+error.message,80,100);parent.postMessage({type:'athena-error',message:error.message},'*')}</script></body></html>`
+  const sandboxDocument = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'unsafe-inline';"><style>*{box-sizing:border-box}html,body,#stage{margin:0;width:100%;height:100%;overflow:hidden;background:#0f0f1e}canvas{width:100%;height:100%;display:block}</style></head><body><div id="stage"><canvas id="board" width="1600" height="900"></canvas></div><script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script><script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script><script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script><script src="https://cdn.jsdelivr.net/npm/p5@1.11.8/lib/p5.min.js"></script><script src="https://cdn.jsdelivr.net/npm/fabric@6.7.1/dist/index.min.js"></script><script src="https://cdn.jsdelivr.net/npm/paper@0.12.18/dist/paper-full.min.js"></script><script>window.animationTime=0;window.setAnimationTime=function(t){window.animationTime=t};const board=document.getElementById('board'),ctx=board.getContext('2d'),stage=document.getElementById('stage'),rc=rough.canvas(board);try{${safeCode}\nparent.postMessage({type:'athena-ready'},'*')}catch(error){ctx.fillStyle='#a78bfa';ctx.font='bold 32px Inter,sans-serif';ctx.fillText('Animation error: '+error.message,80,100);parent.postMessage({type:'athena-error',message:error.message},'*')}</script></body></html>`
+
+  // Listen for iframe messages
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "athena-ready") setIframeReady(true)
+    }
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
+  }, [])
 
   // Subtitle sync
   useEffect(() => {
-    if (!beats.length) return
-    const active = beats.find((b) => b.time <= currentTime && (!beats[beats.indexOf(b) + 1] || beats[beats.indexOf(b) + 1].time > currentTime))
-    setCurrentSubtitle(active?.subtitle ?? "")
-  }, [currentTime, beats])
+    if (!beats.length) {
+      setCurrentSubtitle(caption)
+      return
+    }
+    const active = beats.findLast((b) => b.time <= currentTime)
+    setCurrentSubtitle(active?.subtitle ?? caption)
+  }, [currentTime, beats, caption])
 
-  // Animation loop with beat synchronization
+  // Animation loop
   useEffect(() => {
     if (!isPlaying) return
 
-    const startTime = Date.now() - currentTime * 1000
-    let lastUpdateTime = currentTime
+    startTimeRef.current = Date.now() - currentTime * 1000
 
     const tick = () => {
-      const elapsed = (Date.now() - startTime) / 1000
-      setCurrentTime(Math.min(elapsed, duration))
+      const elapsed = ((Date.now() - startTimeRef.current) / 1000) * speed
+      const clamped = Math.min(elapsed, duration)
+      setCurrentTime(clamped)
 
-      // Update iframe time
       if (iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.setAnimationTime?.(elapsed)
+        try { iframeRef.current.contentWindow.setAnimationTime?.(clamped) } catch { /* ignore */ }
       }
 
-      // Sync audio
-      if (audioRef.current && Math.abs(audioRef.current.currentTime - elapsed) > 0.1) {
-        audioRef.current.currentTime = elapsed
-      }
-
-      if (elapsed >= duration) {
+      if (clamped >= duration) {
         setIsPlaying(false)
         onPartEnd?.()
       } else {
         animationFrameRef.current = requestAnimationFrame(tick)
       }
-
-      lastUpdateTime = elapsed
     }
 
     animationFrameRef.current = requestAnimationFrame(tick)
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
     }
-  }, [isPlaying, currentTime, duration, onPartEnd])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, speed, duration])
 
-  const handlePlayPause = () => setIsPlaying(!isPlaying)
+  const handlePlayPause = () => {
+    if (!isPlaying) startTimeRef.current = Date.now() - currentTime * 1000
+    setIsPlaying(!isPlaying)
+  }
+
   const handleReplay = () => {
     setCurrentTime(0)
+    setRenderKey((k) => k + 1)
     setIsPlaying(true)
+    setIframeReady(false)
   }
+
   const handleSkip = (delta: number) => {
-    setCurrentTime(Math.max(0, Math.min(currentTime + delta, duration)))
+    const next = Math.max(0, Math.min(currentTime + delta, duration))
+    setCurrentTime(next)
+    startTimeRef.current = Date.now() - (next / speed) * 1000
+  }
+
+  const handleSeek = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const frac = e.nativeEvent.offsetX / e.currentTarget.clientWidth
+    const next = frac * duration
+    setCurrentTime(next)
+    startTimeRef.current = Date.now() - (next / speed) * 1000
   }
 
   const progressPercent = (currentTime / duration) * 100
+  const timeLabel = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`
 
   return (
-    <div ref={containerRef} className={`relative flex flex-col rounded-2xl border border-muted overflow-hidden ${isFullscreen ? "fixed inset-0 z-50" : ""}`}>
-      {/* Canvas/Video area */}
-      <div className="relative flex-1 bg-background">
+    <div
+      ref={containerRef}
+      className={`relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_8px_60px_rgba(0,0,0,0.4)] transition-all duration-300 ${
+        isFullscreen ? "fixed inset-0 z-50 rounded-none" : ""
+      }`}
+    >
+      {/* Top bar */}
+      <div className="flex items-center justify-between border-b border-border/60 bg-card/80 px-4 py-2.5 backdrop-blur-sm">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="size-2 rounded-full bg-primary shadow-[0_0_6px_rgba(124,92,252,0.8)]" />
+          <p className="truncate text-sm font-semibold">{topic}</p>
+          {total_parts > 1 && (
+            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+              {part}/{total_parts}
+            </span>
+          )}
+        </div>
+        <button
+          className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-110"
+          onClick={() => setIsFullscreen(!isFullscreen)}
+          aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        >
+          {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+        </button>
+      </div>
+
+      {/* Canvas */}
+      <div className="relative aspect-video w-full overflow-hidden bg-[#0f0f1e]">
+        {!iframeReady && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0f0f1e] z-10">
+            <div className="flex flex-col items-center gap-3">
+              <svg className="size-12" fill="none" viewBox="0 0 64 64">
+                <path d="M32 7 57 54H7L32 7Z" stroke="#7c5cfc" strokeLinejoin="round" strokeWidth="1.5" opacity="0.2" />
+                <path className="athena-loader-path" d="M32 7 57 54H7L32 7Z" pathLength="100" stroke="#7c5cfc" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+              </svg>
+              <p className="text-xs text-muted-foreground">Loading scene...</p>
+            </div>
+          </div>
+        )}
+
         <iframe
           key={renderKey}
           ref={iframeRef}
           title={`Animation: ${topic}`}
-          sandbox={{ allow: ["scripts"] }}
+          sandbox="allow-scripts"
           srcDoc={sandboxDocument}
           className="absolute inset-0 size-full border-0"
         />
 
         {/* Subtitle overlay */}
         {showSubtitles && currentSubtitle && (
-          <div className="absolute inset-x-4 bottom-16 mx-auto max-w-2xl rounded-lg bg-black/70 px-4 py-2 text-center text-sm text-white backdrop-blur">
+          <div className="absolute inset-x-4 bottom-4 mx-auto max-w-2xl rounded-xl bg-black/75 px-5 py-3 text-center text-sm leading-relaxed text-white backdrop-blur-sm shadow-xl">
             {currentSubtitle}
           </div>
         )}
+      </div>
+
+      {/* Controls */}
+      <div className="bg-card/95 px-4 py-3 backdrop-blur-sm">
+        {/* Seek bar */}
+        <div className="mb-2.5 flex items-center gap-2 text-xs text-muted-foreground font-mono">
+          <span>{timeLabel(currentTime)}</span>
+          <button
+            className="h-2 flex-1 overflow-hidden rounded-full bg-muted/30 text-left cursor-pointer"
+            aria-label="Seek animation"
+            onClick={handleSeek}
+          >
+            <span
+              className="block h-full rounded-full bg-gradient-to-r from-primary to-violet-400 transition-[width] duration-100"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </button>
+          <span>{timeLabel(duration)}</span>
+        </div>
 
         {/* Beat markers */}
         {beats.length > 0 && (
-          <div className="absolute inset-x-4 bottom-4 flex gap-1">
+          <div className="mb-2 flex gap-1">
             {beats.map((beat, i) => (
               <button
                 key={i}
-                onClick={() => setCurrentTime(beat.time)}
-                className={`h-2 flex-1 rounded-full transition-colors ${
-                  beat.time <= currentTime ? "bg-primary" : "bg-muted/40 hover:bg-muted/60"
+                onClick={() => {
+                  setCurrentTime(beat.time)
+                  startTimeRef.current = Date.now() - (beat.time / speed) * 1000
+                }}
+                className={`h-1.5 flex-1 rounded-full transition-all duration-200 ${
+                  beat.time <= currentTime
+                    ? "bg-primary shadow-[0_0_4px_rgba(124,92,252,0.5)]"
+                    : "bg-muted/30 hover:bg-muted/60"
                 }`}
-                title={`${beat.action} (${beat.time.toFixed(1)}s)`}
+                title={beat.action}
               />
             ))}
           </div>
         )}
-      </div>
 
-      {/* Control bar */}
-      <div className="border-t border-muted bg-muted/30 p-4 backdrop-blur">
-        {/* Progress bar */}
-        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, "0")}</span>
-          <div className="h-1 flex-1 rounded-full bg-muted/40">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPercent}%` }} />
-          </div>
-          <span>{Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, "0")}</span>
-        </div>
-
-        {/* Buttons */}
+        {/* Buttons row */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
-            <Button size="sm" variant="ghost" onClick={handlePlayPause} className="h-8 w-8 p-0">
-              {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={handleReplay} className="h-8 w-8 p-0">
+          <div className="flex items-center gap-0.5">
+            <button className="player-button" onClick={handleReplay} aria-label="Replay">
               <RotateCcw className="size-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => handleSkip(-5)} className="h-8 w-8 p-0">
+            </button>
+            <button className="player-button" onClick={() => handleSkip(-5)} aria-label="Back 5 seconds">
               <ChevronLeft className="size-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => handleSkip(5)} className="h-8 w-8 p-0">
+            </button>
+            <button
+              className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(124,92,252,0.4)] transition-all hover:shadow-[0_2px_20px_rgba(124,92,252,0.6)] hover:scale-110 active:scale-95"
+              onClick={handlePlayPause}
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
+            </button>
+            <button className="player-button" onClick={() => handleSkip(5)} aria-label="Forward 5 seconds">
               <ChevronRight className="size-4" />
-            </Button>
-          </div>
-
-          <div className="text-xs font-medium text-muted-foreground">
-            {part && total_parts && total_parts > 1 ? `Part ${part}/${total_parts}` : "S-tier animation"}
+            </button>
+            <button
+              className={`player-button ${isMuted ? "bg-accent text-foreground" : ""}`}
+              onClick={() => setIsMuted(!isMuted)}
+              aria-label={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+            </button>
           </div>
 
           <div className="flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
+            <button
+              className={`flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-bold transition-all ${
+                showSubtitles ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent"
+              }`}
               onClick={() => setShowSubtitles(!showSubtitles)}
-              className={`h-8 w-8 p-0 ${showSubtitles ? "text-primary" : "text-muted-foreground"}`}
             >
-              <span className="text-xs font-bold">CC</span>
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setIsMuted(!isMuted)} className="h-8 w-8 p-0">
-              {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="h-8 w-8 p-0"
+              CC
+            </button>
+            <button
+              className="flex h-8 items-center rounded-lg px-2 font-mono text-xs font-bold text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+              onClick={() => setSpeed(speed >= 2 ? 0.5 : Math.round((speed + 0.5) * 10) / 10)}
             >
-              {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-            </Button>
+              {speed}x
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Hidden audio element for TTS */}
+      {/* Hidden audio */}
       <audio ref={audioRef} className="hidden" muted={isMuted} crossOrigin="anonymous" />
     </div>
   )
