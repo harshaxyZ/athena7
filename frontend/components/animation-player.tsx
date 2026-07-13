@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import { gsap } from "gsap"
+import { CinematicPhotosynthesis } from "@/components/cinematic-photosynthesis"
+import { createNarration } from "@/lib/athena-api"
 import {
   Captions,
   Expand,
@@ -17,15 +19,22 @@ import {
 } from "lucide-react"
 
 const scenes = [
-  { label: "The hidden world", caption: "Travel inside a leaf, where sunlight begins a remarkable energy transfer." },
-  { label: "Capturing light", caption: "Chlorophyll absorbs light and excites electrons inside the chloroplast." },
-  { label: "Making energy", caption: "Water and carbon dioxide are transformed into glucose and oxygen." },
+  { at: 0, label: "A leaf wakes", caption: "Every leaf is a living solar factory, quietly reaching toward the light." },
+  { at: 5.8, label: "The ingredients arrive", caption: "Sunlight streams in, water rises through the veins, and carbon dioxide drifts through tiny pores." },
+  { at: 11.8, label: "Inside the chloroplast", caption: "Deep inside each cell, chloroplasts gather the incoming light." },
+  { at: 18, label: "Energy in motion", caption: "Chlorophyll excites electrons, splitting water and releasing fresh oxygen." },
+  { at: 24, label: "Sunlight becomes food", caption: "The captured energy assembles carbon into glucose: stored sunlight that can fuel life." },
 ]
+
+const narrationScript = scenes.map((item) => item.caption).join(" ")
 
 export function AnimationPlayer() {
   const sceneRef = useRef<HTMLDivElement>(null)
   const timelineRef = useRef<gsap.core.Timeline | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = useState(true)
+  const [muted, setMuted] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [expanded, setExpanded] = useState(false)
   const [captions, setCaptions] = useState(true)
   const [speed, setSpeed] = useState(1)
@@ -33,34 +42,100 @@ export function AnimationPlayer() {
 
   useEffect(() => {
     const context = gsap.context(() => {
-      const timeline = gsap.timeline({ repeat: -1, repeatDelay: 0.4 })
+      const timeline = gsap.timeline({ repeat: -1, repeatDelay: 1.2 })
       timeline
-        .fromTo("[data-sun]", { scale: 0.75, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: "back.out(1.6)" })
-        .fromTo("[data-ray]", { strokeDashoffset: 160 }, { strokeDashoffset: 0, duration: 1.1, stagger: 0.08, ease: "power2.out" }, "<0.15")
-        .fromTo("[data-leaf]", { scale: 0.7, rotate: -8, opacity: 0 }, { scale: 1, rotate: 0, opacity: 1, duration: 1, ease: "back.out(1.4)" }, "<0.2")
-        .fromTo("[data-cell]", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.65, stagger: 0.08, ease: "back.out(2)" })
-        .to("[data-particle]", { motionPath: undefined, x: 210, y: -72, duration: 2.2, stagger: 0.18, ease: "sine.inOut", repeat: 1, yoyo: true })
-        .to("[data-leaf]", { rotate: 1.5, transformOrigin: "50% 100%", duration: 1.2, yoyo: true, repeat: 1, ease: "sine.inOut" }, "<")
-        .call(() => setScene((value) => (value + 1) % scenes.length))
+        .fromTo("[data-sun]", { scale: 0.25, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.25, ease: "back.out(1.45)", transformOrigin: "50% 50%" })
+        .fromTo("[data-cloud]", { x: -70, opacity: 0 }, { x: 0, opacity: 0.55, duration: 2.2, ease: "power2.out" }, "<")
+        .fromTo("[data-leaf]", { y: 100, scale: 0.72, rotate: -11, opacity: 0 }, { y: 0, scale: 1, rotate: 0, opacity: 1, duration: 1.65, ease: "back.out(1.35)", transformOrigin: "50% 100%" }, "<0.35")
+        .to("[data-leaf]", { rotate: 1.5, scaleY: 1.018, duration: 1.25, yoyo: true, repeat: 3, ease: "sine.inOut", transformOrigin: "50% 100%" })
+        .call(() => setScene(1), [], 5.8)
+        .fromTo("[data-ray]", { strokeDasharray: 250, strokeDashoffset: 250 }, { strokeDashoffset: 0, duration: 1.8, stagger: 0.12, ease: "power2.out" }, 5.8)
+        .fromTo("[data-droplet]", { y: 100, scale: 0.2, opacity: 0 }, { y: -105, x: 115, scale: 1, opacity: 1, duration: 3.8, stagger: 0.28, ease: "power1.inOut" }, 6.1)
+        .fromTo("[data-molecule]", { x: 100, opacity: 0, scale: 0.4 }, { x: -150, y: 90, opacity: 1, scale: 1, duration: 3.4, stagger: 0.24, ease: "sine.inOut" }, 6.3)
+        .call(() => setScene(2), [], 11.8)
+        .to("[data-shot='world']", { scale: 2.7, x: -530, y: -250, opacity: 0, duration: 1.8, ease: "power3.inOut", transformOrigin: "58% 51%" }, 11.4)
+        .fromTo("[data-shot='inside']", { opacity: 0, scale: 1.22 }, { opacity: 1, scale: 1, duration: 1.8, ease: "power3.out", transformOrigin: "50% 50%" }, 11.8)
+        .fromTo("[data-chloroplast]", { scale: 0.55, rotate: -6 }, { scale: 1, rotate: 0, duration: 2, ease: "back.out(1.25)", transformOrigin: "50% 50%" }, 12)
+        .fromTo("[data-granum]", { scaleY: 0, opacity: 0 }, { scaleY: 1, opacity: 1, duration: 0.9, stagger: 0.11, ease: "back.out(1.8)", transformOrigin: "50% 50%" }, 13)
+        .call(() => setScene(3), [], 18)
+        .fromTo("[data-photon]", { x: -140, y: -80, opacity: 0 }, { x: 260, y: 170, opacity: 1, duration: 2.3, stagger: 0.15, ease: "power2.in" }, 17.5)
+        .fromTo("[data-electron]", { scale: 0, opacity: 0 }, { scale: 1.4, opacity: 1, x: 115, duration: 1.7, stagger: 0.16, yoyo: true, repeat: 1, ease: "sine.inOut", transformOrigin: "50% 50%" }, 19)
+        .fromTo("[data-bubble]", { y: 70, scale: 0, opacity: 0 }, { y: -165, x: 45, scale: 1, opacity: 0.85, duration: 3.4, stagger: 0.18, ease: "power1.out" }, 19.3)
+        .call(() => setScene(4), [], 24)
+        .to("[data-shot='inside']", { opacity: 0, scale: 1.35, duration: 1.3, ease: "power3.in" }, 23.7)
+        .fromTo("[data-shot='finale']", { opacity: 0, scale: 0.88 }, { opacity: 1, scale: 1, duration: 1.5, ease: "power3.out", transformOrigin: "50% 50%" }, 24)
+        .fromTo("[data-atom]", { scale: 0, rotate: -120, opacity: 0 }, { scale: 1, rotate: 0, opacity: 1, duration: 0.85, stagger: 0.12, ease: "back.out(1.9)", transformOrigin: "50% 50%" }, 24.5)
+        .fromTo("[data-glucose]", { rotate: -8 }, { rotate: 4, duration: 1.1, yoyo: true, repeat: 1, ease: "sine.inOut", transformOrigin: "50% 50%" }, 25.5)
+        .to("[data-product-label]", { opacity: 1, y: -8, duration: 0.9, ease: "power2.out" }, 26)
+        .fromTo("[data-sparkle]", { scale: 0, rotate: -90, opacity: 0 }, { scale: 1, rotate: 45, opacity: 1, duration: 0.75, stagger: 0.13, yoyo: true, repeat: 2, ease: "back.out(2)", transformOrigin: "50% 50%" }, 26.2)
+      timeline.eventCallback("onUpdate", () => {
+        const value = timeline.progress()
+        setProgress(value)
+        const audio = audioRef.current
+        if (audio && !audio.paused && Math.abs(audio.currentTime - timeline.time()) > 0.12) {
+          timeline.time(Math.min(audio.currentTime, timeline.duration()), false)
+        }
+      })
+      timeline.eventCallback("onRepeat", () => {
+        setScene(0)
+        if (audioRef.current) audioRef.current.currentTime = 0
+      })
       timelineRef.current = timeline
     }, sceneRef)
     return () => context.revert()
   }, [])
 
   useEffect(() => {
+    let objectUrl = ""
+    createNarration(narrationScript)
+      .then((url) => {
+        objectUrl = url
+        const audio = new Audio(url)
+        audio.preload = "auto"
+        audio.playbackRate = speed
+        audio.muted = muted
+        audioRef.current = audio
+        if (playing) void audio.play().catch(() => undefined)
+      })
+      .catch(() => undefined)
+    return () => {
+      audioRef.current?.pause()
+      audioRef.current = null
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [])
+
+  useEffect(() => {
     timelineRef.current?.timeScale(speed)
+    if (audioRef.current) audioRef.current.playbackRate = speed
   }, [speed])
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.muted = muted
+  }, [muted])
 
   const togglePlayback = () => {
     const timeline = timelineRef.current
     if (!timeline) return
-    if (playing) timeline.pause()
-    else timeline.resume()
+    if (playing) {
+      timeline.pause()
+      audioRef.current?.pause()
+    } else {
+      timeline.resume()
+      if (audioRef.current) {
+        audioRef.current.currentTime = timeline.time()
+        void audioRef.current.play().catch(() => undefined)
+      }
+    }
     setPlaying(!playing)
   }
 
   const replay = () => {
     timelineRef.current?.restart()
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0
+      void audioRef.current.play().catch(() => undefined)
+    }
     setScene(0)
     setPlaying(true)
   }
@@ -87,7 +162,8 @@ export function AnimationPlayer() {
             <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-black/60 md:text-xs"><Gauge className="size-4" /> 60 fps</div>
           </div>
 
-          <svg className="absolute inset-0 size-full" viewBox="0 0 960 540" role="img" aria-label="Animated photosynthesis scene">
+          <CinematicPhotosynthesis />
+          <svg className="hidden" viewBox="0 0 960 540" aria-hidden="true">
             <circle data-sun cx="125" cy="130" r="50" fill="#ff6b4a" />
             {[0, 1, 2, 3].map((ray) => (
               <path key={ray} data-ray d={`M ${180 + ray * 4} ${145 + ray * 21} C 300 ${130 + ray * 30}, 340 ${175 + ray * 35}, 425 ${190 + ray * 38}`} fill="none" stroke="#ff6b4a" strokeDasharray="160" strokeDashoffset="160" strokeLinecap="round" strokeWidth="5" opacity={0.9 - ray * 0.12} />
@@ -120,14 +196,24 @@ export function AnimationPlayer() {
         </div>
 
         <div className="flex flex-col gap-2 bg-card px-3 py-3 md:px-4">
-          <div className="h-1 overflow-hidden rounded-full bg-muted"><div className="h-full w-[38%] rounded-full bg-primary" /></div>
+          <button
+            className="h-2 overflow-hidden rounded-full bg-muted text-left"
+            aria-label="Seek animation"
+            onClick={(event) => {
+              const fraction = event.nativeEvent.offsetX / event.currentTarget.clientWidth
+              timelineRef.current?.progress(fraction)
+              if (audioRef.current) audioRef.current.currentTime = fraction * timelineRef.current!.duration()
+            }}
+          >
+            <span className="block h-full rounded-full bg-primary transition-[width] duration-100" style={{ width: `${progress * 100}%` }} />
+          </button>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <button className="player-button" onClick={replay} aria-label="Replay"><RotateCcw /></button>
               <button className="player-button hidden sm:flex" aria-label="Back five seconds"><SkipBack /></button>
               <button className="player-button bg-primary text-primary-foreground hover:bg-primary/90" onClick={togglePlayback} aria-label={playing ? "Pause" : "Play"}>{playing ? <Pause /> : <Play />}</button>
               <button className="player-button hidden sm:flex" aria-label="Forward five seconds"><SkipForward /></button>
-              <button className="player-button" aria-label="Volume"><Volume2 /></button>
+              <button className={`player-button ${muted ? "bg-accent" : ""}`} onClick={() => setMuted(!muted)} aria-label={muted ? "Unmute narration" : "Mute narration"}><Volume2 /></button>
             </div>
             <div className="flex items-center gap-1">
               <button className={`player-button ${captions ? "bg-accent text-foreground" : ""}`} onClick={() => setCaptions(!captions)} aria-label="Toggle captions"><Captions /></button>

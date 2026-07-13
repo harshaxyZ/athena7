@@ -21,6 +21,16 @@ export async function getBackendHealth(): Promise<BackendHealth> {
   return response.json()
 }
 
+export async function createNarration(text: string): Promise<string> {
+  const response = await fetch(`${API_URL}/api/narration`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, language: "en-IN" }),
+  })
+  if (!response.ok) throw new Error(`Narration unavailable (${response.status})`)
+  return URL.createObjectURL(await response.blob())
+}
+
 export async function getGlobalUsage(): Promise<UsageSummary> {
   const response = await fetch(`${API_URL}/api/tokens/global`, { cache: "no-store" })
   if (!response.ok) throw new Error(`Usage unavailable (${response.status})`)
