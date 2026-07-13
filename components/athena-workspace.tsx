@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import useSWR from "swr"
 import {
   ArrowUp,
   Atom,
@@ -25,7 +24,6 @@ import {
 } from "lucide-react"
 import { AnimationPlayer } from "@/components/animation-player"
 import { AthenaLoader, AthenaLogo } from "@/components/athena-logo"
-import { getBackendHealth } from "@/lib/athena-api"
 
 const chats = [
   { title: "How photosynthesis works", time: "Now" },
@@ -41,11 +39,6 @@ const prompts = [
 ]
 
 export function AthenaWorkspace() {
-  const { data: backend, error: backendError, isLoading: backendLoading } = useSWR(
-    "athena-backend-health",
-    getBackendHealth,
-    { refreshInterval: 10_000, shouldRetryOnError: true },
-  )
   const [sidebar, setSidebar] = useState(true)
   const [mobileMenu, setMobileMenu] = useState(false)
   const [model, setModel] = useState("GLM 5.2")
@@ -136,15 +129,6 @@ export function AthenaWorkspace() {
             <div className="min-w-0"><p className="truncate text-sm font-medium">Photosynthesis, visually</p><p className="hidden text-[11px] text-muted-foreground sm:block">Interactive learning session</p></div>
           </div>
           <div className="flex items-center gap-1.5 md:gap-2">
-            <div
-              className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-[11px] sm:flex"
-              title={backendError ? "Athena backend service is unreachable" : backend ? `${backend.service} v${backend.version}` : "Checking Athena backend service"}
-              role="status"
-            >
-              <span className={`size-2 rounded-full ${backend ? "bg-primary" : backendError ? "bg-destructive" : "animate-pulse bg-muted-foreground"}`} />
-              <span className="font-medium">{backend ? "Backend live" : backendError ? "Backend offline" : backendLoading ? "Connecting" : "Checking"}</span>
-              <span className="hidden text-muted-foreground md:inline">/backend</span>
-            </div>
             <div className="hidden items-center gap-3 rounded-xl border border-border bg-card px-3 py-1.5 lg:flex">
               <div><p className="text-[9px] uppercase tracking-wider text-muted-foreground">Tokens</p><p className="font-mono text-xs">2,482</p></div>
               <div className="h-5 w-px bg-border" />

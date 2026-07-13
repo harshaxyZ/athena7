@@ -3,14 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --port 3000",
-    "dev:full": "concurrently --kill-others --names backend,frontend --prefix-colors cyan,white \"pnpm dev:backend\" \"pnpm dev:frontend\"",
-    "dev:backend": "uv run --with-requirements backend/requirements.txt uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload",
-    "dev:frontend": "next dev --hostname 0.0.0.0 --port 3000",
+    "dev": "next dev",
     "build": "next build",
-    "start": "concurrently --kill-others --names backend,frontend \"pnpm start:backend\" \"pnpm start:frontend\"",
-    "start:backend": "uv run --with-requirements backend/requirements.txt uvicorn backend.main:app --host 0.0.0.0 --port 8000",
-    "start:frontend": "next start --hostname 0.0.0.0 --port 3000",
+    "start": "next start",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -18,14 +13,12 @@
     "@vercel/analytics": "1.6.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "concurrently": "^10.0.3",
     "gsap": "^3.15.0",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
     "react": "^19",
     "react-dom": "^19",
     "shadcn": "^4.8.0",
-    "swr": "^2.4.2",
     "tailwind-merge": "^3.3.1",
     "tw-animate-css": "^1.4.0"
   },
