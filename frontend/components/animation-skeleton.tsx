@@ -46,9 +46,7 @@ export function AnimationSkeleton({ part = 1, total_parts = 1, message }: Animat
     <div className="relative flex h-[28rem] w-full flex-col items-center justify-center overflow-hidden rounded-2xl border border-border bg-card">
       {/* Ambient glow background */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/6 blur-3xl" />
-        <div className="absolute left-1/4 top-1/4 h-32 w-32 rounded-full bg-violet-500/4 blur-2xl" />
-        <div className="absolute right-1/4 bottom-1/4 h-32 w-32 rounded-full bg-primary/4 blur-2xl" />
+        <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/3 blur-3xl" />
       </div>
 
       {/* Shimmer scan line */}
@@ -59,26 +57,21 @@ export function AnimationSkeleton({ part = 1, total_parts = 1, message }: Animat
         {/* Animated triangle loader */}
         <div className="relative">
           <svg className="size-16" fill="none" viewBox="0 0 64 64">
-            <defs>
-              <linearGradient id="sk-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#7c5cfc" />
-                <stop offset="100%" stopColor="#a78bfa" />
-              </linearGradient>
-            </defs>
-            <path d="M32 7 57 54H7L32 7Z" stroke="#7c5cfc" strokeLinejoin="round" strokeWidth="1.5" opacity="0.15" />
-            <path
+            <rect x="8" y="8" width="48" height="48" rx="6" stroke="currentColor" strokeWidth="1.5" transform="rotate(45 32 32)" opacity="0.12" />
+            <rect
               className="athena-loader-path"
-              d="M32 7 57 54H7L32 7Z"
-              pathLength="100"
-              stroke="url(#sk-grad)"
+              x="8" y="8" width="48" height="48"
+              rx="6"
+              stroke="currentColor"
               strokeLinecap="round"
-              strokeLinejoin="round"
               strokeWidth="2.5"
+              transform="rotate(45 32 32)"
+              pathLength="100"
             />
           </svg>
 
           {/* Orbiting dot */}
-          <span className="orbit absolute left-1/2 top-1/2 -ml-1 -mt-1 size-2 rounded-full bg-primary" />
+          <span className="orbit absolute left-1/2 top-1/2 -ml-1 -mt-1 size-2 rounded-full bg-foreground" />
         </div>
 
         {/* Step message */}
@@ -95,7 +88,7 @@ export function AnimationSkeleton({ part = 1, total_parts = 1, message }: Animat
         <div className="w-48 space-y-3">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary via-violet-400 to-primary transition-all duration-700 ease-out"
+              className="h-full rounded-full bg-foreground transition-all duration-700 ease-out"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -108,7 +101,7 @@ export function AnimationSkeleton({ part = 1, total_parts = 1, message }: Animat
                   key={i}
                   className={`h-1.5 w-6 rounded-full transition-all duration-500 ${
                     i < part
-                      ? "bg-primary shadow-[0_0_8px_rgba(124,92,252,0.6)]"
+                      ? "bg-foreground"
                       : "bg-muted/30"
                   }`}
                 />

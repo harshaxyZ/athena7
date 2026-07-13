@@ -150,10 +150,10 @@ export function AnimationPlayerSync({
       {/* Top bar */}
       <div className="flex items-center justify-between border-b border-border/60 bg-card/80 px-4 py-2.5 backdrop-blur-sm">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="size-2 rounded-full bg-primary shadow-[0_0_6px_rgba(124,92,252,0.8)]" />
+          <div className="size-2 rounded-full bg-foreground" />
           <p className="truncate text-sm font-semibold">{topic}</p>
           {total_parts > 1 && (
-            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+            <span className="shrink-0 rounded-full border border-border bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               {part}/{total_parts}
             </span>
           )}
@@ -168,13 +168,13 @@ export function AnimationPlayerSync({
       </div>
 
       {/* Canvas */}
-      <div className="relative aspect-video w-full overflow-hidden bg-[#0f0f1e]">
+      <div className="relative aspect-video w-full overflow-hidden bg-[#0a0a0a]">
         {!iframeReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0f0f1e] z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10">
             <div className="flex flex-col items-center gap-3">
-              <svg className="size-12" fill="none" viewBox="0 0 64 64">
-                <path d="M32 7 57 54H7L32 7Z" stroke="#7c5cfc" strokeLinejoin="round" strokeWidth="1.5" opacity="0.2" />
-                <path className="athena-loader-path" d="M32 7 57 54H7L32 7Z" pathLength="100" stroke="#7c5cfc" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+              <svg className="size-12 text-white" fill="none" viewBox="0 0 64 64">
+                <rect x="8" y="8" width="48" height="48" rx="6" stroke="currentColor" strokeWidth="1.5" transform="rotate(45 32 32)" opacity="0.15" />
+                <rect className="athena-loader-path" x="8" y="8" width="48" height="48" rx="6" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" transform="rotate(45 32 32)" pathLength="100" />
               </svg>
               <p className="text-xs text-muted-foreground">Loading scene...</p>
             </div>
@@ -209,7 +209,7 @@ export function AnimationPlayerSync({
             onClick={handleSeek}
           >
             <span
-              className="block h-full rounded-full bg-gradient-to-r from-primary to-violet-400 transition-[width] duration-100"
+              className="block h-full rounded-full bg-foreground transition-[width] duration-100"
               style={{ width: `${progressPercent}%` }}
             />
           </button>
@@ -228,7 +228,7 @@ export function AnimationPlayerSync({
                 }}
                 className={`h-1.5 flex-1 rounded-full transition-all duration-200 ${
                   beat.time <= currentTime
-                    ? "bg-primary shadow-[0_0_4px_rgba(124,92,252,0.5)]"
+                    ? "bg-foreground"
                     : "bg-muted/30 hover:bg-muted/60"
                 }`}
                 title={beat.action}
@@ -247,7 +247,7 @@ export function AnimationPlayerSync({
               <ChevronLeft className="size-4" />
             </button>
             <button
-              className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(124,92,252,0.4)] transition-all hover:shadow-[0_2px_20px_rgba(124,92,252,0.6)] hover:scale-110 active:scale-95"
+              className="flex size-9 items-center justify-center rounded-xl bg-foreground text-background shadow-[0_2px_12px_rgba(0,0,0,0.4)] transition-all hover:opacity-80 hover:scale-110 active:scale-95"
               onClick={handlePlayPause}
               aria-label={isPlaying ? "Pause" : "Play"}
             >
@@ -268,7 +268,7 @@ export function AnimationPlayerSync({
           <div className="flex items-center gap-1">
             <button
               className={`flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-bold transition-all ${
-                showSubtitles ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent"
+                showSubtitles ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent"
               }`}
               onClick={() => setShowSubtitles(!showSubtitles)}
             >

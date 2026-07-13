@@ -26,7 +26,6 @@ import {
   Brain,
   Telescope,
 } from "lucide-react"
-import { AnimationPlayer } from "@/components/animation-player"
 import { AnimationPlayerSync } from "@/components/animation-player-sync"
 import { AnimationSkeleton } from "@/components/animation-skeleton"
 import { AthenaLoader, AthenaLogo } from "@/components/athena-logo"
@@ -39,9 +38,9 @@ const chats = [
 ]
 
 const prompts = [
-  { icon: Atom, label: "Quantum entanglement", detail: "Follow two particles across space", color: "text-violet-400", bg: "bg-violet-500/10" },
-  { icon: FlaskConical, label: "CRISPR gene editing", detail: "Step inside a living cell", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-  { icon: BookOpen, label: "The Indian monsoon", detail: "Fly with the seasonal winds", color: "text-sky-400", bg: "bg-sky-500/10" },
+  { icon: Atom,        label: "Quantum entanglement", detail: "Follow two particles across space" },
+  { icon: FlaskConical, label: "CRISPR gene editing",   detail: "Step inside a living cell"        },
+  { icon: BookOpen,    label: "The Indian monsoon",    detail: "Fly with the seasonal winds"       },
 ]
 
 const generationSteps = [
@@ -90,7 +89,6 @@ export function AthenaWorkspace() {
     setInput("")
     setGenerationStep(0)
 
-    // Advance generation step every 6s for perceived progress
     let step = 0
     stepTimerRef.current = setInterval(() => {
       step = Math.min(step + 1, generationSteps.length - 1)
@@ -133,14 +131,13 @@ export function AthenaWorkspace() {
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col bg-sidebar p-3 text-sidebar-foreground">
+      {/* Brand */}
       <div className="flex items-center justify-between px-1 py-1">
         <div className="flex items-center gap-2.5">
-          <div className="flex size-8 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+          <div className="flex size-8 items-center justify-center rounded-xl border border-border bg-card">
             <AthenaLogo className="size-5" />
           </div>
-          <span className="bg-gradient-to-r from-foreground to-primary bg-clip-text text-sm font-bold tracking-tight text-transparent">
-            Athena
-          </span>
+          <span className="text-sm font-bold tracking-tight">Athena</span>
         </div>
         <button
           className="icon-button"
@@ -151,9 +148,10 @@ export function AthenaWorkspace() {
         </button>
       </div>
 
+      {/* New chat */}
       <button
         onClick={() => { setStarted(false); setResponse(""); setAnimationParts([]); setError("") }}
-        className="mt-4 flex w-full items-center gap-2.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_4px_20px_rgba(124,92,252,0.35)] transition-all duration-200 hover:shadow-[0_4px_28px_rgba(124,92,252,0.55)] hover:scale-[1.01] active:scale-[0.99]"
+        className="mt-4 flex w-full items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-semibold transition-all duration-200 hover:bg-accent hover:scale-[1.01] active:scale-[0.99]"
       >
         <MessageSquarePlus className="size-4" /> New conversation
       </button>
@@ -166,7 +164,7 @@ export function AthenaWorkspace() {
         {chats.map((chat, i) => (
           <button
             key={chat.title}
-            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150 ${
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150 ${
               i === 0
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -183,7 +181,9 @@ export function AthenaWorkspace() {
         <button className="sidebar-link"><Languages className="size-4" /> Languages <span className="ml-auto text-[10px]">EN</span></button>
         <button className="sidebar-link"><Settings className="size-4" /> Settings</button>
         <div className="mt-2 flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-sidebar-accent">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-[0_2px_10px_rgba(124,92,252,0.4)]">A</span>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-bold text-background">
+            A
+          </span>
           <span className="min-w-0">
             <span className="block text-sm font-semibold">Student</span>
             <span className="block text-[11px] text-muted-foreground">Learning workspace</span>
@@ -195,12 +195,13 @@ export function AthenaWorkspace() {
 
   return (
     <main className="flex h-dvh overflow-hidden bg-background text-foreground">
-      {/* Sidebar */}
+      {/* Sidebar — desktop */}
       {sidebar && (
         <aside className="hidden w-64 shrink-0 border-r border-sidebar-border lg:block">
           <SidebarContent />
         </aside>
       )}
+      {/* Sidebar — mobile overlay */}
       {mobileMenu && (
         <>
           <button
@@ -214,10 +215,10 @@ export function AthenaWorkspace() {
         </>
       )}
 
-      {/* Main area */}
+      {/* Main */}
       <section className="flex min-w-0 flex-1 flex-col">
         {/* Header */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3 backdrop-blur-sm md:px-5">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3 md:px-5">
           <div className="flex min-w-0 items-center gap-2">
             {!sidebar && (
               <button className="icon-button hidden lg:flex" onClick={() => setSidebar(true)} aria-label="Open sidebar">
@@ -233,7 +234,7 @@ export function AthenaWorkspace() {
                 <span className="hidden text-sm font-semibold text-foreground sm:block">Athena</span>
               </div>
             )}
-            <div className="min-w-0 ml-1">
+            <div className="ml-1 min-w-0">
               <p className="truncate text-sm font-semibold">
                 {submittedPrompt || "New visual conversation"}
               </p>
@@ -244,7 +245,7 @@ export function AthenaWorkspace() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Live stats */}
+            {/* Live stats pill */}
             {(usage.total_tokens || elapsed > 0) && (
               <div className="hidden items-center gap-3 rounded-xl border border-border bg-card px-3 py-1.5 lg:flex">
                 <div>
@@ -269,7 +270,7 @@ export function AthenaWorkspace() {
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="h-9 appearance-none rounded-xl border border-border bg-card pl-3 pr-8 text-xs font-semibold outline-none transition-all hover:bg-accent hover:border-primary/30 focus:ring-2 focus:ring-ring/40"
+                className="h-9 appearance-none rounded-xl border border-border bg-card pl-3 pr-8 text-xs font-semibold outline-none transition-all hover:bg-accent focus:ring-2 focus:ring-ring/40"
               >
                 <option>Claude Sonnet 4.6</option>
                 <option>Qwen 3.6 Flash</option>
@@ -280,53 +281,57 @@ export function AthenaWorkspace() {
           </div>
         </header>
 
-        {/* Content */}
+        {/* Content scroll area */}
         <div className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
           {!started ? (
-            /* ─── LANDING ─────────────────────────────────────────── */
+            /* ── LANDING ─────────────────────────────────────────── */
             <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-4 py-12 md:px-8">
-              {/* Hero */}
               <motion.div
-                className="mb-10 flex max-w-3xl flex-col gap-5"
+                className="mb-10 flex max-w-3xl flex-col gap-6"
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
               >
+                {/* Logo lockup */}
                 <div className="flex items-center gap-3">
-                  <div className="glow-pulse flex size-14 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/25">
-                    <AthenaLogo className="size-8" />
+                  <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-card">
+                    <AthenaLogo className="size-7" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-primary">Athena · AI Learning</p>
-                    <p className="text-sm text-muted-foreground">Powered by Claude Sonnet 4.6</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-foreground">Athena</p>
+                    <p className="text-sm text-muted-foreground">AI Learning Platform</p>
                   </div>
                 </div>
 
+                {/* Headline */}
                 <h1 className="text-balance text-4xl font-bold tracking-[-0.04em] leading-[1.1] md:text-6xl">
                   See ideas come{" "}
-                  <span className="bg-gradient-to-r from-primary via-violet-400 to-primary bg-clip-text text-transparent">
+                  <span className="underline decoration-foreground/20 underline-offset-4">
                     alive.
                   </span>
                 </h1>
                 <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
                   Ask any question. Upload your textbook. Athena turns complex concepts into
-                  narrated, cinematic animations — in seconds.
+                  narrated cinematic animations — in seconds.
                 </p>
 
                 {/* Feature pills */}
                 <motion.div
                   className="flex flex-wrap gap-2"
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.18, ease: "easeOut" }}
                 >
                   {[
-                    { icon: Zap, text: "S-tier animations" },
-                    { icon: Brain, text: "Precise narration" },
-                    { icon: Telescope, text: "Any topic" },
+                    { icon: Zap,       text: "S-tier animations" },
+                    { icon: Brain,     text: "Precise narration"  },
+                    { icon: Telescope, text: "Any topic"          },
                   ].map(({ icon: Icon, text }) => (
-                    <span key={text} className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                      <Icon className="size-3.5 text-primary" />
+                    <span
+                      key={text}
+                      className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+                    >
+                      <Icon className="size-3.5" />
                       {text}
                     </span>
                   ))}
@@ -335,19 +340,19 @@ export function AthenaWorkspace() {
 
               {/* Prompt chips */}
               <div className="grid gap-3 md:grid-cols-3">
-                {prompts.map(({ icon: Icon, label, detail, color, bg }, i) => (
+                {prompts.map(({ icon: Icon, label, detail }, i) => (
                   <motion.button
                     key={label}
                     onClick={() => setInput(`Teach me ${label.toLowerCase()} with a cinematic animation`)}
-                    className="prompt-chip group"
+                    className="prompt-chip"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.28 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <span className={`rounded-xl p-2.5 transition-colors duration-300 ${bg}`}>
-                      <Icon className={`size-5 ${color}`} />
+                    <span className="rounded-xl border border-border bg-accent p-2.5">
+                      <Icon className="size-5 text-foreground" />
                     </span>
                     <span className="min-w-0 text-left">
                       <span className="block text-sm font-semibold leading-snug">{label}</span>
@@ -358,23 +363,23 @@ export function AthenaWorkspace() {
               </div>
             </div>
           ) : (
-            /* ─── CONVERSATION ────────────────────────────────────── */
+            /* ── CONVERSATION ────────────────────────────────────── */
             <div className="mx-auto flex max-w-4xl flex-col gap-8 px-3 py-8 md:px-8 md:py-10">
-              {/* User message */}
+              {/* User bubble */}
               <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-5 py-3.5 text-sm font-medium leading-relaxed text-primary-foreground shadow-[0_4px_20px_rgba(124,92,252,0.3)]">
+                <div className="max-w-[85%] rounded-2xl rounded-br-md bg-foreground px-5 py-3.5 text-sm font-medium leading-relaxed text-background">
                   {submittedPrompt}
                 </div>
               </div>
 
               {/* Athena response */}
               <article className="flex max-w-3xl gap-3">
-                <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+                <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-card">
                   <AthenaLogo className="size-4" />
                 </div>
-                <div className="flex flex-col gap-4 min-w-0">
+                <div className="flex min-w-0 flex-col gap-4">
                   <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-widest text-primary">Athena</p>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">Athena</p>
                     <h2 className="text-xl font-bold tracking-tight">
                       {generating && !response ? (
                         <span className="flex items-center gap-2 text-muted-foreground">
@@ -388,11 +393,6 @@ export function AthenaWorkspace() {
                     {response && (
                       <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
                         {response}
-                      </p>
-                    )}
-                    {!response && !generating && (
-                      <p className="mt-3 text-sm text-muted-foreground">
-                        Preparing a precise explanation before directing the animation.
                       </p>
                     )}
                   </div>
@@ -411,9 +411,9 @@ export function AthenaWorkspace() {
                   {animationParts.length > 0 ? (
                     <section className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                           <Sparkles className="size-4" />
-                          <span>Part 1 of {animationParts[0]?.total_parts || 1} ready · Playing now</span>
+                          <span>Part 1 of {animationParts[0]?.total_parts || 1} ready · Playing</span>
                         </div>
                         <span className="font-mono text-xs text-muted-foreground">{elapsed}s</span>
                       </div>
@@ -434,13 +434,15 @@ export function AthenaWorkspace() {
                           }
                         }}
                       />
-                      {waitingForNextPart && animationParts[currentPartIndex]?.total_parts && currentPartIndex < (animationParts[currentPartIndex]?.total_parts ?? 1) - 1 && (
-                        <AnimationSkeleton
-                          part={currentPartIndex + 2}
-                          total_parts={animationParts[currentPartIndex]?.total_parts || 1}
-                          message="Preparing next part in the background"
-                        />
-                      )}
+                      {waitingForNextPart &&
+                        animationParts[currentPartIndex]?.total_parts != null &&
+                        currentPartIndex < (animationParts[currentPartIndex]?.total_parts ?? 1) - 1 && (
+                          <AnimationSkeleton
+                            part={currentPartIndex + 2}
+                            total_parts={animationParts[currentPartIndex]?.total_parts || 1}
+                            message="Preparing next part"
+                          />
+                        )}
                     </section>
                   ) : (
                     <AnimationSkeleton
@@ -453,14 +455,12 @@ export function AthenaWorkspace() {
               ) : (
                 <>
                   {animationParts.length > 0 && (
-                    <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5">
-                      <Sparkles className="size-4 text-primary" />
-                      <span className="text-xs font-semibold text-primary">
-                        Athena generated {animationParts.length} scene{animationParts.length > 1 ? "s" : ""} in {Math.max(elapsed, 7)} seconds
+                    <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5">
+                      <Sparkles className="size-4 text-foreground" />
+                      <span className="text-xs font-semibold text-foreground">
+                        {animationParts.length} scene{animationParts.length > 1 ? "s" : ""} generated in {Math.max(elapsed, 7)}s
                       </span>
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        Claude Sonnet 4.6
-                      </span>
+                      <span className="ml-auto text-xs text-muted-foreground">Claude Sonnet 4.6</span>
                     </div>
                   )}
 
@@ -482,6 +482,7 @@ export function AthenaWorkspace() {
                         }}
                       />
 
+                      {/* Part switcher */}
                       {animationParts.length > 1 && (
                         <div className="flex gap-2">
                           {animationParts.map((_, i) => (
@@ -490,7 +491,7 @@ export function AthenaWorkspace() {
                               onClick={() => setCurrentPartIndex(i)}
                               className={`flex-1 rounded-xl py-2.5 text-xs font-bold tracking-wide transition-all duration-200 ${
                                 i === currentPartIndex
-                                  ? "bg-primary text-primary-foreground shadow-[0_4px_16px_rgba(124,92,252,0.35)]"
+                                  ? "bg-foreground text-background"
                                   : "bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"
                               }`}
                             >
@@ -521,9 +522,9 @@ export function AthenaWorkspace() {
                       </div>
                     </section>
                   ) : error ? (
-                    <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-5 text-sm text-red-400">
-                      <p className="font-semibold mb-1">Animation failed</p>
-                      <p className="text-red-400/80">{error}</p>
+                    <div className="rounded-2xl border border-border bg-card p-5 text-sm">
+                      <p className="mb-1 font-semibold">Animation failed</p>
+                      <p className="text-muted-foreground">{error}</p>
                     </div>
                   ) : null}
                 </>
@@ -535,7 +536,7 @@ export function AthenaWorkspace() {
         {/* Composer */}
         <footer className="shrink-0 bg-background/80 px-3 pb-3 pt-2 backdrop-blur-sm md:px-6 md:pb-5">
           <div className="mx-auto max-w-3xl">
-            <div className="rounded-2xl border border-border bg-card shadow-[0_8px_40px_rgba(0,0,0,0.2)] transition-all duration-300 focus-within:border-primary/40 focus-within:shadow-[0_8px_40px_rgba(124,92,252,0.15)]">
+            <div className="rounded-2xl border border-border bg-card shadow-[0_8px_32px_rgba(0,0,0,0.25)] transition-all duration-300 focus-within:border-foreground/30">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -545,7 +546,7 @@ export function AthenaWorkspace() {
                     submit()
                   }
                 }}
-                className="max-h-44 min-h-[3.5rem] w-full resize-none bg-transparent px-4 py-3.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/60"
+                className="max-h-44 min-h-[3.5rem] w-full resize-none bg-transparent px-4 py-3.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/50"
                 placeholder={`Ask anything \u2014 \u201cHow does a black hole form?\u201d or paste your notes\u2026`}
               />
               <div className="flex items-center justify-between gap-2 px-2 pb-2">
@@ -557,11 +558,7 @@ export function AthenaWorkspace() {
                     accept=".pdf,.txt,.md,.docx,.pptx"
                     onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
                   />
-                  <button
-                    className="composer-button"
-                    onClick={() => fileInputRef.current?.click()}
-                    aria-label="Attach study material"
-                  >
+                  <button className="composer-button" onClick={() => fileInputRef.current?.click()} aria-label="Attach study material">
                     <Paperclip />
                   </button>
                   <button
@@ -572,7 +569,7 @@ export function AthenaWorkspace() {
                     <WandSparkles />
                   </button>
                   {attachment ? (
-                    <span className="flex min-w-0 items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                    <span className="flex min-w-0 items-center gap-1.5 rounded-lg border border-border bg-accent px-2.5 py-1 text-[11px] font-medium text-foreground">
                       <FileText className="size-3.5 shrink-0" />
                       <span className="max-w-36 truncate">{attachment.name}</span>
                       <button onClick={() => setAttachment(null)} aria-label="Remove attachment">
@@ -596,7 +593,7 @@ export function AthenaWorkspace() {
                     aria-label="Generate animation"
                   >
                     {generating ? (
-                      <span className="size-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+                      <span className="size-4 animate-spin rounded-full border-2 border-background/30 border-t-background" />
                     ) : (
                       <ArrowUp className="size-4" />
                     )}
@@ -606,7 +603,7 @@ export function AthenaWorkspace() {
             </div>
             <p className="mt-2 text-center text-[10px] text-muted-foreground/50">
               Athena can make mistakes. Verify important information.
-            </p>
+        </p>
           </div>
         </footer>
       </section>
