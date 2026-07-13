@@ -15,11 +15,23 @@ export type UsageSummary = {
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "")
 
-export type AnimationData = { type: "js_scene"; code: string; topic: string; caption: string; duration: number; plan?: { title?: string } }
+export type Beat = { time: number; action: string; objects: string; camera: string; narration: string; subtitle: string }
+export type AnimationData = {
+  type: "js_scene"
+  code: string
+  topic: string
+  caption: string
+  duration: number
+  beats?: Beat[]
+  part?: number
+  total_parts?: number
+  plan?: { title?: string }
+}
 export type ChatEvent =
   | { type: "text"; content: string }
   | { type: "status"; content: string }
   | { type: "animation"; data: AnimationData }
+  | { type: "animation_part"; data: AnimationData }
   | { type: "animation_error" | "error"; content: string }
   | { type: "cost"; data: UsageSummary }
   | { type: "done"; conversation_id: string }

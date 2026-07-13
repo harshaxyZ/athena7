@@ -6,6 +6,7 @@ Produces rich, animated educational scenes with rough.js/GSAP/p5.js.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -211,23 +212,98 @@ async def generate_step_visual(ctx: AgentContext, step: LessonStep) -> str:
         return _fallback(ctx.topic)
 
 
-async def generate_chat_visual(topic: str, description: str, session_id: str = "") -> dict:
-    """Plan, code, and validate a topic-specific canvas animation."""
-    plan_prompt = [{"role": "system", "content": "You are an animation director. Return compact JSON only with title, caption, duration (8-20 seconds), visual_style, and 3-5 timed beats containing action, objects, camera, and narration."}, {"role": "user", "content": f"Exact student request: {topic}\nTeaching context: {description[:900]}"}]
-    plan_raw = await llm_chat(messages=plan_prompt, model="google/gemini-2.5-flash", temperature=0.35, max_tokens=900, agent="visual_planner", session_id=session_id)
+def _estimate_duration(storyboard: dict) -> int:
+    """Estimate animation duration in seconds based on beats."""
+    beats = storyboard.get("beats", [])
+    if beats and isinstance(beats, list) and len(beats) > 0:
+        last_beat = beats[-1]
+        if isinstance(last_beat, dict) and "time" in last_beat:
+            return int(last_beat.get("time", 14)) + 2
+    return int(storyboard.get("duration", 14))
+
+
+async def generate_chat_visual(topic: str, description: str, session_id: str = "", part: int = 1, total_parts: int = 1) -> dict:
+    """Plan, code, and validate a topic-specific canvas animation with multi-part support."""
+    part_suffix = f"\n[PART {part} OF {total_parts}]" if total_parts > 1 else ""
+    plan_prompt = [
+        {"role": "system", "content": "You are an animation director. Return compact JSON only with title, caption, duration (seconds), visual_style, and 3-5 timed beats containing action, objects, camera, and narration."},
+        {"role": "user", "content": f"Exact student request: {topic}\nTeaching context: {description[:900]}{part_suffix}\n\nRETURN ONLY VALID JSON."}
+    ]
+    plan_raw = await llm_chat(messages=plan_prompt, model="anthropic/claude-opus-4.8", temperature=0.35, max_tokens=900, agent="visual_planner", session_id=session_id)
     cleaned_plan = re.sub(r"^```json\s*|\s*```$", "", plan_raw.strip(), flags=re.IGNORECASE)
     try:
         plan = json.loads(cleaned_plan)
     except json.JSONDecodeError as exc:
         raise ValueError("The animation storyboard could not be parsed") from exc
 
-    messages = [{"role": "system", "content": VISUAL_SYSTEM_PROMPT}, {"role": "user", "content": f"Exact request: {topic}\nStoryboard JSON: {json.dumps(plan)}\nCreate a topic-specific animated scene. Do not substitute another topic. Use requestAnimationFrame or GSAP for continuous motion and fill the full canvas."}]
+    # Validate and fix duration
+    duration = _estimate_duration(plan)
+    plan["duration"] = max(8, min(300, duration))
+
+    messages = [
+        {"role": "system", "content": VISUAL_SYSTEM_PROMPT},
+        {"role": "user", "content": f"Exact request: {topic}{part_suffix}\nStoryboard JSON: {json.dumps(plan)}\nCreate a topic-specific animated scene. Do not substitute another topic. Use requestAnimationFrame or GSAP for continuous motion and fill the full canvas. SYNC beats with narration."}
+    ]
     feedback = ""
     for attempt in range(2):
         request = messages if not feedback else messages + [{"role": "user", "content": f"The previous program failed validation: {feedback}. Rewrite it as safe raw JavaScript only."}]
-        code = await llm_chat(messages=request, model="google/gemini-2.5-flash", temperature=0.45, max_tokens=2800, agent="visual_generator", session_id=session_id)
+        code = await llm_chat(messages=request, model="anthropic/claude-fable-5", temperature=0.45, max_tokens=3200, agent="visual_generator", session_id=session_id)
         program = _sanitize(code)
         feedback = _validation_error(program) or ""
         if not feedback:
-            return {"type": "js_scene", "code": program, "plan": plan, "topic": topic, "caption": str(plan.get("caption", description[:220])), "duration": max(8, min(20, int(plan.get("duration", 14))))}
+            return {
+                "type": "js_scene",
+                "code": program,
+                "plan": plan,
+                "topic": topic,
+                "caption": str(plan.get("caption", description[:220])),
+                "duration": plan["duration"],
+                "beats": plan.get("beats", []),
+                "part": part,
+                "total_parts": total_parts,
+            }
     raise ValueError(f"Generated animation was unsafe or invalid: {feedback}")
+
+
+async def generate_multipart_animations(topic: str, full_explanation: str, session_id: str = "") -> dict:
+    """Intelligently split long animations into parts and generate them with pre-fetching."""
+    # Estimate total duration from explanation length
+    estimated_minutes = max(1, len(full_explanation.split()) // 150)
+    
+    if estimated_minutes <= 3:
+        # Single animation
+        animation = await generate_chat_visual(topic, full_explanation, session_id, part=1, total_parts=1)
+        return {
+            "type": "multipart",
+            "parts": [animation],
+            "total_parts": 1,
+            "total_duration": animation["duration"],
+        }
+    
+    elif estimated_minutes <= 5:
+        # Two parts: generate part 1, queue part 2
+        part1 = await generate_chat_visual(topic, full_explanation, session_id, part=1, total_parts=2)
+        # Queue part 2 in background (don't await yet)
+        part2_task = asyncio.create_task(generate_chat_visual(topic, full_explanation, session_id, part=2, total_parts=2))
+        
+        return {
+            "type": "multipart",
+            "parts": [part1],
+            "queued_parts": [{"task": part2_task, "part_num": 2}],
+            "total_parts": 2,
+            "total_duration": part1["duration"],  # Will add part 2 duration when ready
+        }
+    
+    else:
+        # Three parts: generate part 1, queue parts 2 and 3
+        part1 = await generate_chat_visual(topic, full_explanation, session_id, part=1, total_parts=3)
+        part2_task = asyncio.create_task(generate_chat_visual(topic, full_explanation, session_id, part=2, total_parts=3))
+        part3_task = asyncio.create_task(generate_chat_visual(topic, full_explanation, session_id, part=3, total_parts=3))
+        
+        return {
+            "type": "multipart",
+            "parts": [part1],
+            "queued_parts": [{"task": part2_task, "part_num": 2}, {"task": part3_task, "part_num": 3}],
+            "total_parts": 3,
+            "total_duration": part1["duration"],
+        }

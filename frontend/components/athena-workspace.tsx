@@ -24,6 +24,8 @@ import {
   X,
 } from "lucide-react"
 import { AnimationPlayer } from "@/components/animation-player"
+import { AnimationPlayerSync } from "@/components/animation-player-sync"
+import { AnimationSkeleton } from "@/components/animation-skeleton"
 import { AthenaLoader, AthenaLogo } from "@/components/athena-logo"
 
 const chats = [
@@ -53,6 +55,9 @@ export function AthenaWorkspace() {
   const [response, setResponse] = useState("")
   const [status, setStatus] = useState("")
   const [animation, setAnimation] = useState<AnimationData | null>(null)
+  const [animationParts, setAnimationParts] = useState<AnimationData[]>([])
+  const [currentPartIndex, setCurrentPartIndex] = useState(0)
+  const [waitingForNextPart, setWaitingForNextPart] = useState(false)
   const [error, setError] = useState("")
   const [conversationId, setConversationId] = useState("")
   const [usage, setUsage] = useState<UsageSummary>({})
@@ -77,7 +82,15 @@ export function AthenaWorkspace() {
         setElapsed(Math.floor((performance.now() - startedAt) / 1000))
         if (event.type === "text") setResponse((value) => value + event.content)
         if (event.type === "status") setStatus(event.content)
-        if (event.type === "animation") setAnimation(event.data)
+        if (event.type === "animation") {
+          setAnimation(event.data)
+          setAnimationParts([event.data])
+          setCurrentPartIndex(0)
+        }
+        if (event.type === "animation_part") {
+          setAnimationParts((prev) => [...prev, event.data])
+          setWaitingForNextPart(false)
+        }
         if (event.type === "animation_error" || event.type === "error") setError(event.content)
         if (event.type === "cost") setUsage(event.data)
         if (event.type === "done") setConversationId(event.conversation_id)
@@ -169,23 +182,105 @@ export function AthenaWorkspace() {
               <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground">{submittedPrompt}</div>
               <article className="flex max-w-3xl gap-3"><span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full border border-border"><AthenaLogo className="size-4" /></span><div className="flex flex-col gap-4"><div><p className="text-xs font-medium text-muted-foreground">Athena</p><h2 className="mt-2 text-xl font-semibold tracking-tight">{generating && !response ? "Understanding your request" : "Here&apos;s the visual explanation."}</h2><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{response || "Athena is preparing a concise explanation before directing the animation."}</p></div><div className="flex items-center gap-1"><button className="message-action"><Copy /> Copy</button><button className="message-action"><WandSparkles /> Animate</button></div></div></article>
               {generating ? (
-                <section className="overflow-hidden rounded-2xl border border-border bg-card">
-                  <div className="aspect-video bg-[#f3f2ed] p-5 text-[#121212] md:p-8">
-                    <div className="flex h-full flex-col justify-between">
-                      <div className="flex items-center justify-between"><span className="rounded-full border border-black/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[.16em]">Creating visual story</span><span className="font-mono text-xs text-black/55">{elapsed}s</span></div>
-                      <div className="mx-auto flex max-w-md flex-col items-center gap-5 text-center">
-                        <AthenaLoader />
-                        <div><h3 className="text-balance text-xl font-semibold tracking-tight md:text-3xl">{status || generationSteps[generationStep]}</h3><p className="mt-2 text-sm text-black/55">The request is being explained, storyboarded, coded, and safety-checked.</p></div>
+                <>
+                  {animationParts.length > 0 ? (
+                    <section className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Sparkles className="size-4" />
+                          <span>Playing part 1 of {animationParts[0]?.total_parts || 1}</span>
+                        </div>
+                        <span className="font-mono text-xs text-muted-foreground">{elapsed}s</span>
                       </div>
-                      <div><div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-black/50"><span>Scene {Math.min(3, generationStep + 1)} of 3</span><span>Ready in about {secondsLeft}s</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-[#121212] transition-[width] duration-500" style={{ width: `${Math.min(96, 10 + elapsed * 9)}%` }} /></div></div>
-                    </div>
-                  </div>
-                </section>
+                      <AnimationPlayerSync
+                        code={animationParts[currentPartIndex]?.code || ""}
+                        topic={animationParts[currentPartIndex]?.topic || submittedPrompt}
+                        caption={animationParts[currentPartIndex]?.caption || ""}
+                        duration={animationParts[currentPartIndex]?.duration || 14}
+                        beats={animationParts[currentPartIndex]?.beats || []}
+                        part={animationParts[currentPartIndex]?.part || 1}
+                        total_parts={animationParts[currentPartIndex]?.total_parts || 1}
+                        autoPlay
+                        onPartEnd={() => {
+                          if (currentPartIndex < animationParts.length - 1) {
+                            setCurrentPartIndex(currentPartIndex + 1)
+                          } else {
+                            setWaitingForNextPart(true)
+                          }
+                        }}
+                      />
+                      {waitingForNextPart && animationParts[currentPartIndex]?.total_parts && currentPartIndex < animationParts[currentPartIndex]!.total_parts! - 1 && (
+                        <AnimationSkeleton
+                          part={(currentPartIndex + 2)}
+                          total_parts={animationParts[currentPartIndex]?.total_parts || 1}
+                          message="Next part is being prepared"
+                        />
+                      )}
+                    </section>
+                  ) : (
+                    <AnimationSkeleton
+                      part={1}
+                      total_parts={1}
+                      message={status || generationSteps[generationStep] || "Generating animation..."}
+                    />
+                  )}
+                </>
               ) : (
                 <>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><Sparkles className="size-4" /><span>Athena created 3 scenes in {Math.max(elapsed, 9)} seconds</span></div>
-                  {animation ? <AnimationPlayer code={animation.code} topic={animation.topic || submittedPrompt} caption={animation.caption || response} duration={animation.duration} /> : <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-5 text-sm text-destructive">{error || "No animation was returned. Try describing the motion and objects more specifically."}</div>}
-                  <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4"><div className="metric-card"><span>Model</span><strong>{model}</strong></div><div className="metric-card"><span>Generation</span><strong>{elapsed} seconds</strong></div><div className="metric-card"><span>Tokens</span><strong>{usage.total_tokens ?? "—"}</strong></div><div className="metric-card"><span>Cost</span><strong>{usage.total_cost_usd ? `$${usage.total_cost_usd.toFixed(4)}` : "—"}</strong></div></div>
+                  {animationParts.length > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Sparkles className="size-4" />
+                      <span>Athena created {animationParts.length} scene{animationParts.length > 1 ? "s" : ""} in {Math.max(elapsed, 9)} seconds</span>
+                    </div>
+                  )}
+                  {animationParts.length > 0 ? (
+                    <section className="space-y-4">
+                      <AnimationPlayerSync
+                        code={animationParts[currentPartIndex]?.code || ""}
+                        topic={animationParts[currentPartIndex]?.topic || submittedPrompt}
+                        caption={animationParts[currentPartIndex]?.caption || response}
+                        duration={animationParts[currentPartIndex]?.duration || 14}
+                        beats={animationParts[currentPartIndex]?.beats || []}
+                        part={animationParts[currentPartIndex]?.part}
+                        total_parts={animationParts[currentPartIndex]?.total_parts}
+                        autoPlay={false}
+                        onPartEnd={() => {
+                          if (currentPartIndex < animationParts.length - 1) {
+                            setCurrentPartIndex(currentPartIndex + 1)
+                          }
+                        }}
+                      />
+                      {animationParts.length > 1 && (
+                        <div className="flex gap-2">
+                          {animationParts.map((_, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setCurrentPartIndex(i)}
+                              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-colors ${
+                                i === currentPartIndex
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              }`}
+                            >
+                              Part {i + 1}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  ) : (
+                    <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-5 text-sm text-destructive">
+                      {error || "No animation was returned. Try describing the motion and objects more specifically."}
+                    </div>
+                  )}
+                  {animationParts.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+                      <div className="metric-card"><span>Model</span><strong>S-tier</strong></div>
+                      <div className="metric-card"><span>Generation</span><strong>{elapsed} seconds</strong></div>
+                      <div className="metric-card"><span>Tokens</span><strong>{usage.total_tokens ?? "—"}</strong></div>
+                      <div className="metric-card"><span>Cost</span><strong>{usage.total_cost_usd ? `₹${(usage.total_cost_usd * 82).toFixed(2)}` : "—"}</strong></div>
+                    </div>
+                  )}
                 </>
               )}
             </div>

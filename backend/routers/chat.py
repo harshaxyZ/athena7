@@ -178,14 +178,40 @@ async def chat_message(
                 full_response += token
                 yield f"data: {json.dumps({'type': 'text', 'content': token})}\n\n"
 
-            # Generate a storyboard and topic-specific canvas program when requested.
+            # Generate storyboard and canvas animations with intelligent multi-part support.
             if wants_animation and full_response:
                 try:
                     yield f"data: {json.dumps({'type': 'status', 'content': 'Planning the visual story'})}\n\n"
-                    from backend.agents.visual_generator import generate_chat_visual
-                    animation_data = await generate_chat_visual(topic=message, description=full_response, session_id=conversation_id)
-                    yield f"data: {json.dumps({'type': 'status', 'content': 'Validating the animation'})}\n\n"
-                    yield f"data: {json.dumps({'type': 'animation', 'data': animation_data})}\n\n"
+                    from backend.agents.visual_generator import generate_multipart_animations
+                    multipart_data = await generate_multipart_animations(topic=message, full_explanation=full_response, session_id=conversation_id)
+                    
+                    # Stream first part immediately
+                    if multipart_data.get("parts"):
+                        yield f"data: {json.dumps({'type': 'status', 'content': 'Validating animation part 1'})}\n\n"
+                        yield f"data: {json.dumps({'type': 'animation', 'data': multipart_data['parts'][0]})}\n\n"
+                    
+                    # If there are queued parts, poll and stream them as they complete
+                    if multipart_data.get("queued_parts"):
+                        import asyncio
+                        queued = multipart_data["queued_parts"]
+                        completed = [multipart_data["parts"][0]]
+                        
+                        while queued:
+                            tasks = [q["task"] for q in queued]
+                            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, timeout=90)
+                            
+                            for task in done:
+                                try:
+                                    result = await task
+                                    part_num = next(q["part_num"] for q in queued if q["task"] == task)
+                                    yield f"data: {json.dumps({'type': 'status', 'content': f'Animation part {part_num} ready'})}\n\n"
+                                    yield f"data: {json.dumps({'type': 'animation_part', 'data': result})}\n\n"
+                                    completed.append(result)
+                                    queued = [q for q in queued if q["task"] != task]
+                                except Exception as e:
+                                    logger.warning("Part generation failed: %s", e)
+                                    queued = [q for q in queued if q["task"] != task]
+                    
                     yield f"data: {json.dumps({'type': 'status', 'content': ''})}\n\n"
                 except Exception as exc:
                     logger.warning("Animation generation failed: %s", exc)
