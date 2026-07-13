@@ -229,11 +229,14 @@ async def generate_chat_visual(topic: str, description: str, session_id: str = "
         {"role": "system", "content": "You are an animation director. Return compact JSON only with title, caption, duration (seconds), visual_style, and 3-5 timed beats containing action, objects, camera, and narration."},
         {"role": "user", "content": f"Exact student request: {topic}\nTeaching context: {description[:900]}{part_suffix}\n\nRETURN ONLY VALID JSON."}
     ]
-    plan_raw = await llm_chat(messages=plan_prompt, model="anthropic/claude-opus-4.8", temperature=0.35, max_tokens=900, agent="visual_planner", session_id=session_id)
-    cleaned_plan = re.sub(r"^```json\s*|\s*```$", "", plan_raw.strip(), flags=re.IGNORECASE)
+    plan_raw = await llm_chat(messages=plan_prompt, model="anthropic/claude-opus-4.8", temperature=0.35, max_tokens=2500, agent="visual_planner", session_id=session_id)
+    # Extract JSON robustly using regex if there's markdown wrapping or trailing text
+    json_match = re.search(r"(\{.*\})", plan_raw, re.DOTALL)
+    cleaned_plan = json_match.group(1) if json_match else plan_raw.strip()
     try:
         plan = json.loads(cleaned_plan)
     except json.JSONDecodeError as exc:
+        print(f"FAILED TO PARSE JSON. RAW RESPONSE WAS:\n{plan_raw}")
         raise ValueError("The animation storyboard could not be parsed") from exc
 
     # Validate and fix duration
@@ -247,7 +250,7 @@ async def generate_chat_visual(topic: str, description: str, session_id: str = "
     feedback = ""
     for attempt in range(2):
         request = messages if not feedback else messages + [{"role": "user", "content": f"The previous program failed validation: {feedback}. Rewrite it as safe raw JavaScript only."}]
-        code = await llm_chat(messages=request, model="anthropic/claude-sonnet-4-6", temperature=0.45, max_tokens=3200, agent="visual_generator", session_id=session_id)
+        code = await llm_chat(messages=request, model="anthropic/claude-sonnet-4-6", temperature=0.45, max_tokens=8000, agent="visual_generator", session_id=session_id)
         program = _sanitize(code)
         feedback = _validation_error(program) or ""
         if not feedback:

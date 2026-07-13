@@ -92,7 +92,7 @@ async def ask_direct_question(
     question: str = Form(...),
     language: str = Form(default="hi-IN"),
     topic: str = Form(default=""),
-    background_tasks: BackgroundTasks = None,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Ask a direct question without uploading a file."""
     session_id = str(uuid.uuid4())
@@ -103,8 +103,7 @@ async def ask_direct_question(
         topic=topic or "Student Question",
     )
     store_session(ctx)
-    if background_tasks:
-        background_tasks.add_task(run_pipeline_bg, session_id, ctx)
+    background_tasks.add_task(run_pipeline_bg, session_id, ctx)
     return SessionResponse(session_id=session_id, status="processing")
 
 

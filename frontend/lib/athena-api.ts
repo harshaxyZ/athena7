@@ -34,6 +34,7 @@ export type ChatEvent =
   | { type: "animation_part"; data: AnimationData }
   | { type: "animation_error" | "error"; content: string }
   | { type: "cost"; data: UsageSummary }
+  | { type: "audio"; data: string }
   | { type: "done"; conversation_id: string }
 
 export async function streamChat(input: { message: string; conversationId?: string; file?: File; signal?: AbortSignal; onEvent: (event: ChatEvent) => void }) {
@@ -49,12 +50,16 @@ export async function streamChat(input: { message: string; conversationId?: stri
   let buffer = ""
   while (true) {
     const { value, done } = await reader.read()
-    buffer += decoder.decode(value, { stream: !done })
+    if (value) buffer += decoder.decode(value, { stream: !done })
     const frames = buffer.split("\n\n")
     buffer = frames.pop() ?? ""
     for (const frame of frames) {
       const line = frame.split("\n").find((item) => item.startsWith("data: "))
-      if (line) input.onEvent(JSON.parse(line.slice(6)) as ChatEvent)
+      if (line) {
+        const evt = JSON.parse(line.slice(6)) as ChatEvent
+        input.onEvent(evt)
+        if (evt.type === "done" || evt.type === "error") return
+      }
     }
     if (done) break
   }

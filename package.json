@@ -7,6 +7,7 @@
     "dev": "concurrently --kill-others --names backend,frontend --prefix-colors cyan,white \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload",
+    "start:backend": "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4",
     "build": "npm run build --prefix frontend"
   },
   "devDependencies": {

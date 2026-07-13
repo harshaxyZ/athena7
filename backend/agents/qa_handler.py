@@ -68,7 +68,7 @@ async def prepare_qa_content(ctx: AgentContext) -> AgentContext:
         },
     ]
 
-    result = await llm_chat(messages=messages, temperature=0.4)
+    result = await llm_chat(messages=messages, temperature=0.4, agent="qa_handler", session_id=ctx.session_id)
     try:
         parsed = json.loads(result)
         ctx.qa_pairs = parsed.get("qa_pairs", [])
@@ -96,7 +96,7 @@ async def handle_doubt(ctx: AgentContext) -> AgentContext:
 
     messages = [
         {
-            "role": "user",
+            "role": "system",
             "content": DOUBT_SYSTEM_PROMPT.format(
                 class_level=class_level,
                 topic=ctx.topic,
@@ -105,9 +105,13 @@ async def handle_doubt(ctx: AgentContext) -> AgentContext:
                 question=ctx.user_question,
             ),
         },
+        {
+            "role": "user",
+            "content": ctx.user_question,
+        },
     ]
 
-    answer = await llm_chat(messages=messages, temperature=0.5, max_tokens=500)
+    answer = await llm_chat(messages=messages, temperature=0.5, max_tokens=500, agent="doubt_handler", session_id=ctx.session_id)
 
     # Store the answer for the SSE stream
     ctx.knowledge_graph["doubt_answer"] = answer

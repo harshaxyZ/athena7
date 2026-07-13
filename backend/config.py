@@ -29,9 +29,9 @@ class Settings:
     LESSONS_DIR: str = str(Path(__file__).parent / "lessons")
     CONVERSATIONS_DIR: str = str(Path(__file__).parent / "conversations")
     MAX_FILE_SIZE_MB: int = 20
-    LLM_MAX_CONCURRENT: int = 5
-    LLM_TIMEOUT_SECONDS: int = int(os.getenv("LLM_TIMEOUT_SECONDS", "120"))
-    VISUAL_MAX_CONCURRENT: int = int(os.getenv("VISUAL_MAX_CONCURRENT", "5"))
+    LLM_MAX_CONCURRENT: int = int(os.getenv("LLM_MAX_CONCURRENT", "50"))
+    LLM_TIMEOUT_SECONDS: int = int(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
+    VISUAL_MAX_CONCURRENT: int = int(os.getenv("VISUAL_MAX_CONCURRENT", "20"))
     FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 
     # ── Cost ───────────────────────────────────────────────────────

@@ -180,6 +180,7 @@ async def chat_message(
 
             # Generate storyboard and canvas animations with intelligent multi-part support.
             if wants_animation and full_response:
+                yield f"data: {json.dumps({'type': 'animation_start'})}\n\n"
                 try:
                     yield f"data: {json.dumps({'type': 'status', 'content': 'Planning the visual story'})}\n\n"
                     from backend.agents.visual_generator import generate_multipart_animations
@@ -187,14 +188,14 @@ async def chat_message(
                     
                     # Stream first part immediately
                     if multipart_data.get("parts"):
+                        animation_data = multipart_data["parts"][0]
                         yield f"data: {json.dumps({'type': 'status', 'content': 'Validating animation part 1'})}\n\n"
-                        yield f"data: {json.dumps({'type': 'animation', 'data': multipart_data['parts'][0]})}\n\n"
+                        yield f"data: {json.dumps({'type': 'animation', 'data': animation_data})}\n\n"
                     
                     # If there are queued parts, poll and stream them as they complete
                     if multipart_data.get("queued_parts"):
                         import asyncio
                         queued = multipart_data["queued_parts"]
-                        completed = [multipart_data["parts"][0]]
                         
                         while queued:
                             tasks = [q["task"] for q in queued]
@@ -206,7 +207,6 @@ async def chat_message(
                                     part_num = next(q["part_num"] for q in queued if q["task"] == task)
                                     yield f"data: {json.dumps({'type': 'status', 'content': f'Animation part {part_num} ready'})}\n\n"
                                     yield f"data: {json.dumps({'type': 'animation_part', 'data': result})}\n\n"
-                                    completed.append(result)
                                     queued = [q for q in queued if q["task"] != task]
                                 except Exception as e:
                                     logger.warning("Part generation failed: %s", e)
@@ -218,8 +218,8 @@ async def chat_message(
                     yield f"data: {json.dumps({'type': 'animation_error', 'content': str(exc)})}\n\n"
                     yield f"data: {json.dumps({'type': 'status', 'content': ''})}\n\n"
 
-            # Generate TTS if non-English
-            if language != "en-IN" and full_response:
+            # Generate TTS
+            if full_response:
                 try:
                     tts_text = full_response[:500]  # Limit TTS length
                     audio_b64 = await text_to_speech_base64(tts_text, language=language)
@@ -238,9 +238,13 @@ async def chat_message(
             messages.append(assistant_msg)
             _conversations[conversation_id] = messages
 
-            # Save to disk
+            # Save to disk — strip bulky document_context to keep JSON small
+            save_msgs = [
+                {k: v for k, v in m.items() if k != "document_context"}
+                for m in messages
+            ]
             title = messages[0]["content"][:60] if messages else "New Chat"
-            save_conversation(conversation_id, title, messages, language)
+            save_conversation(conversation_id, title, save_msgs, language)
 
             # Send final cost data
             tracker = get_tracker()

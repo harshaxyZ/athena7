@@ -25,19 +25,10 @@ import {
 import { AnimationPlayerSync } from "@/components/animation-player-sync"
 import { AnimationSkeleton } from "@/components/animation-skeleton"
 import { AthenaLogo } from "@/components/athena-logo"
+import ReactMarkdown from "react-markdown"
 
 // Empty chats - fresh start for all users
 const chats: { title: string; time: string }[] = []
-
-
-
-const generationSteps = [
-  "Reading your question",
-  "Planning the visual story",
-  "Choreographing animations",
-  "Synchronising narration",
-  "Finalising the scene",
-]
 
 export function AthenaWorkspace() {
   const { theme, setTheme } = useTheme()
@@ -47,20 +38,20 @@ export function AthenaWorkspace() {
   const [input, setInput] = useState("")
   const [started, setStarted] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [generationStep, setGenerationStep] = useState(0)
-  const [elapsed, setElapsed] = useState(0)
-  const [submittedPrompt, setSubmittedPrompt] = useState("")
-  const [response, setResponse] = useState("")
-  const [status, setStatus] = useState("")
-  const [animationParts, setAnimationParts] = useState<AnimationData[]>([])
-  const [currentPartIndex, setCurrentPartIndex] = useState(0)
-  const [waitingForNextPart, setWaitingForNextPart] = useState(false)
   const [error, setError] = useState("")
   const [conversationId, setConversationId] = useState("")
   const [usage, setUsage] = useState<UsageSummary>({})
+  const [audioBase64, setAudioBase64] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
+  const [response, setResponse] = useState("")
+  const [submittedPrompt, setSubmittedPrompt] = useState("")
+  const [animationParts, setAnimationParts] = useState<AnimationData[]>([])
+  const [currentPartIndex, setCurrentPartIndex] = useState(0)
+  const [status, setStatus] = useState("")
+  const [elapsed, setElapsed] = useState(0)
+  const [waitingForNextPart, setWaitingForNextPart] = useState(false)
+  const [isAnimating, setIsAnimating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const submit = async () => {
     const prompt = input.trim()
@@ -73,16 +64,11 @@ export function AthenaWorkspace() {
     setAnimationParts([])
     setCurrentPartIndex(0)
     setError("")
-    setStatus("Understanding your request")
+    setStatus("")
     setElapsed(0)
     setInput("")
-    setGenerationStep(0)
-
-    let step = 0
-    stepTimerRef.current = setInterval(() => {
-      step = Math.min(step + 1, generationSteps.length - 1)
-      setGenerationStep(step)
-    }, 6000)
+    setAudioBase64("")
+    setIsAnimating(false)
 
     try {
       await streamChat({
@@ -93,14 +79,17 @@ export function AthenaWorkspace() {
           setElapsed(Math.floor((performance.now() - startedAt) / 1000))
           if (event.type === "text") setResponse((v) => v + event.content)
           if (event.type === "status") setStatus(event.content)
+          if (event.type === "animation_start") setIsAnimating(true)
           if (event.type === "animation") {
             setAnimationParts([event.data])
             setCurrentPartIndex(0)
+            setIsAnimating(true)
           }
           if (event.type === "animation_part") {
             setAnimationParts((prev) => [...prev, event.data])
             setWaitingForNextPart(false)
           }
+          if (event.type === "audio") setAudioBase64(event.data)
           if (event.type === "animation_error" || event.type === "error") setError(event.content)
           if (event.type === "cost") setUsage(event.data)
           if (event.type === "done") setConversationId(event.conversation_id)
@@ -112,11 +101,10 @@ export function AthenaWorkspace() {
       setGenerating(false)
       setStatus("")
       setAttachment(null)
-      if (stepTimerRef.current) clearInterval(stepTimerRef.current)
     }
   }
 
-  const costInr = usage.total_cost_usd ? (usage.total_cost_usd * 84).toFixed(2) : null
+  const costInr = usage.total_cost_usd ? (usage.total_cost_usd * 83.5).toFixed(2) : null
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col bg-sidebar p-3 text-sidebar-foreground">
@@ -183,7 +171,7 @@ export function AthenaWorkspace() {
   )
 
   return (
-    <main className="flex h-dvh overflow-hidden bg-background text-foreground">
+    <main className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Sidebar — desktop */}
       {sidebar && (
         <aside className="hidden w-64 shrink-0 border-r border-sidebar-border lg:block">
@@ -370,31 +358,6 @@ export function AthenaWorkspace() {
                     Upload documents. Ask questions. Watch concepts transform into stunning cinematic explanations in seconds.
                   </motion.p>
 
-                  {/* Stats/features grid */}
-                  <motion.div
-                    className="mt-6 grid gap-3 sm:grid-cols-3"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4, duration: 0.6 }}
-                  >
-                    {[
-                      { label: "S-tier animations", value: "Canvas + GSAP" },
-                      { label: "Precise narration", value: "Real-time sync" },
-                      { label: "Any topic", value: "Zero limits" },
-                    ].map(({ label, value }) => (
-                      <motion.div
-                        key={label}
-                        className="group rounded-xl border border-border bg-card p-4 transition-all hover:border-foreground/40 hover:bg-accent"
-                        whileHover={{ y: -2 }}
-                      >
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
-                          {label}
-                        </p>
-                        <p className="mt-1.5 text-sm font-medium">{value}</p>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-
                   {/* CTA hint */}
                   <motion.div
                     className="mt-8 flex items-center gap-3 text-xs text-muted-foreground"
@@ -411,7 +374,7 @@ export function AthenaWorkspace() {
             </div>
           ) : (
             /* ── CONVERSATION ────────────────────────────────────── */
-            <div className="mx-auto flex max-w-4xl flex-col gap-8 px-3 py-8 md:px-8 md:py-10">
+            <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-3 py-8 md:px-8 md:py-10">
               {/* User bubble */}
               <div className="flex justify-end">
                 <div className="max-w-[85%] rounded-2xl rounded-br-md bg-foreground px-5 py-3.5 text-sm font-medium leading-relaxed text-background">
@@ -420,7 +383,7 @@ export function AthenaWorkspace() {
               </div>
 
               {/* Athena response */}
-              <article className="flex max-w-3xl gap-3">
+              <article className="flex w-full gap-3">
                 <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-card">
                   <AthenaLogo className="size-4" />
                 </div>
@@ -430,7 +393,7 @@ export function AthenaWorkspace() {
                     <h2 className="text-xl font-bold tracking-tight">
                       {generating && !response ? (
                         <span className="flex items-center gap-2 text-muted-foreground">
-                          {status || generationSteps[generationStep]}
+                          {status || "Thinking..."}
                           <span className="cursor" aria-hidden="true" />
                         </span>
                       ) : (
@@ -438,22 +401,22 @@ export function AthenaWorkspace() {
                       )}
                     </h2>
                     {response && (
-                      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
-                        {response}
-                      </p>
+                      <div className="mt-3 text-sm leading-7 text-foreground font-medium prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown>{response}</ReactMarkdown>
+                      </div>
                     )}
                   </div>
                   {response && (
                     <div className="flex items-center gap-1">
                       <button className="message-action"><Copy className="size-3.5" /> Copy</button>
-                      <button className="message-action" onClick={submit}><WandSparkles className="size-3.5" /> Animate again</button>
+                      <button className="message-action" onClick={() => { setInput(submittedPrompt); submit() }}><WandSparkles className="size-3.5" /> Animate again</button>
                     </div>
                   )}
                 </div>
               </article>
 
               {/* Animation area */}
-              {generating ? (
+              {generating && isAnimating ? (
                 <>
                   {animationParts.length > 0 ? (
                     <section className="space-y-4">
@@ -472,6 +435,7 @@ export function AthenaWorkspace() {
                         beats={animationParts[currentPartIndex]?.beats || []}
                         part={animationParts[currentPartIndex]?.part || 1}
                         total_parts={animationParts[currentPartIndex]?.total_parts || 1}
+                        audioBase64={audioBase64}
                         autoPlay
                         onPartEnd={() => {
                           if (currentPartIndex < animationParts.length - 1) {
@@ -491,26 +455,22 @@ export function AthenaWorkspace() {
                           />
                         )}
                     </section>
-                  ) : (
-                    <AnimationSkeleton
-                      part={1}
-                      total_parts={1}
-                      message={status || generationSteps[generationStep]}
-                    />
-                  )}
-                </>
-              ) : (
-                <>
-                  {animationParts.length > 0 && (
+                  ) : status ? (
+                      <AnimationSkeleton
+                        part={1}
+                        total_parts={1}
+                        message={status || "Planning the visual story"}
+                      />
+                    ) : null}
+                  </>
+                ) : !generating && animationParts.length > 0 ? (
+                  <>
                     <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5">
                       <Sparkles className="size-4 text-foreground" />
                       <span className="text-xs font-semibold text-foreground">
                         {animationParts.length} scene{animationParts.length > 1 ? "s" : ""} generated in {Math.max(elapsed, 7)}s
                       </span>
                     </div>
-                  )}
-
-                  {animationParts.length > 0 ? (
                     <section className="space-y-4">
                       <AnimationPlayerSync
                         code={animationParts[currentPartIndex]?.code || ""}
@@ -563,14 +523,13 @@ export function AthenaWorkspace() {
                         </div>
                       </div>
                     </section>
-                  ) : error ? (
-                    <div className="rounded-2xl border border-border bg-card p-5 text-sm">
-                      <p className="mb-1 font-semibold">Animation failed</p>
-                      <p className="text-muted-foreground">{error}</p>
-                    </div>
-                  ) : null}
-                </>
-              )}
+                  </>
+                ) : error ? (
+                  <div className="rounded-2xl border border-border bg-card p-5 text-sm">
+                    <p className="mb-1 font-semibold">Animation failed</p>
+                    <p className="text-muted-foreground">{error}</p>
+                  </div>
+                ) : null}
             </div>
           )}
         </div>
@@ -588,7 +547,8 @@ export function AthenaWorkspace() {
                     submit()
                   }
                 }}
-                className="max-h-44 min-h-[3.5rem] w-full resize-none bg-transparent px-4 py-3.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/50"
+                rows={1}
+                className="max-h-44 min-h-0 w-full resize-none bg-transparent px-4 py-2 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/50"
                 placeholder={`Ask anything \u2014 \u201cHow does a black hole form?\u201d or paste your notes\u2026`}
               />
               <div className="flex items-center justify-between gap-2 px-2 pb-2">

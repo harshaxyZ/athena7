@@ -1,33 +1,48 @@
-# athena7
+# Athena — Learn Beyond Words
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+Athena is an AI-powered interactive learning platform that transforms plain text and documents into stunning, cinematic visual explanations in seconds.
 
-## Built with v0
+## Tech Stack
+- **Frontend**: Next.js 16 + React 19, TailwindCSS, Framer Motion
+- **Backend**: FastAPI + Python
+- **AI Orchestration**:
+  - `anthropic/claude-opus-4.8` (Visual Planner - Scene Strategy)
+  - `anthropic/claude-sonnet-4-6` (Visual Code Generator - GSAP animation code)
+  - `GLM-5.2` (Initial content analysis and concept extraction)
+  - `Sarvam Bulbul:v3` (10-language TTS for narration)
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
-
-[Continue working on v0 →](https://v0.app/chat/projects/prj_THjGA0rlisKJyMtkv8aKpJClJaoM)
+## Features
+- **A2A Pipeline**: Sophisticated multi-agent architecture handling prep stage (sequential), production stage (concurrent), and delivery (SSE streaming).
+- **Real-time Sync**: Audio-visual synchronization playing GSAP animations perfectly timed with TTS narration.
+- **Performance**: Optimized for 1000+ concurrent users with async/await and stateless design.
+- **Modern UI**: Dark/Light theme toggle, premium aesthetics, and responsive layout.
 
 ## Getting Started
 
-First, run the development server:
+### 1. Backend Setup
+1. Navigate to the `backend/` directory.
+2. Create a virtual environment and install dependencies:
+   ```bash
+   python -m venv venv
+   .\venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+3. Copy `.env.example` to `.env` and fill in your API keys.
+4. Run the server:
+   ```bash
+   .\start_backend.ps1
+   # or
+   uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-## Learn More
-
-To learn more, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+### 2. Frontend Setup
+1. Navigate to the `frontend/` directory.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+4. Open [http://localhost:3000](http://localhost:3000) (or 3001) in your browser.

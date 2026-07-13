@@ -29,6 +29,7 @@ type AnimationPlayerSyncProps = {
   beats?: Beat[]
   part?: number
   total_parts?: number
+  audioBase64?: string
   onPartEnd?: () => void
   autoPlay?: boolean
 }
@@ -41,6 +42,7 @@ export function AnimationPlayerSync({
   beats = [],
   part = 1,
   total_parts = 1,
+  audioBase64,
   onPartEnd,
   autoPlay = true,
 }: AnimationPlayerSyncProps) {
@@ -61,7 +63,7 @@ export function AnimationPlayerSync({
   const startTimeRef = useRef<number>(Date.now() - currentTime * 1000)
 
   const safeCode = code.replace(/<\/script/gi, "<\\/script")
-  const sandboxDocument = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'unsafe-inline';"><style>*{box-sizing:border-box}html,body,#stage{margin:0;width:100%;height:100%;overflow:hidden;background:#0f0f1e}canvas{width:100%;height:100%;display:block}</style></head><body><div id="stage"><canvas id="board" width="1600" height="900"></canvas></div><script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script><script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script><script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script><script src="https://cdn.jsdelivr.net/npm/p5@1.11.8/lib/p5.min.js"></script><script src="https://cdn.jsdelivr.net/npm/fabric@6.7.1/dist/index.min.js"></script><script src="https://cdn.jsdelivr.net/npm/paper@0.12.18/dist/paper-full.min.js"></script><script>window.animationTime=0;window.setAnimationTime=function(t){window.animationTime=t};const board=document.getElementById('board'),ctx=board.getContext('2d'),stage=document.getElementById('stage'),rc=rough.canvas(board);try{${safeCode}\nparent.postMessage({type:'athena-ready'},'*')}catch(error){ctx.fillStyle='#a78bfa';ctx.font='bold 32px Inter,sans-serif';ctx.fillText('Animation error: '+error.message,80,100);parent.postMessage({type:'athena-error',message:error.message},'*')}</script></body></html>`
+  const sandboxDocument = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'unsafe-inline';"><style>*{box-sizing:border-box}html,body,#stage{margin:0;width:100%;height:100%;overflow:hidden;background:#ffffff}canvas{width:100%;height:100%;display:block}</style></head><body><div id="stage"><canvas id="board" width="1600" height="900"></canvas></div><script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script><script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script><script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script><script src="https://cdn.jsdelivr.net/npm/p5@1.11.8/lib/p5.min.js"></script><script src="https://cdn.jsdelivr.net/npm/fabric@6.7.1/dist/index.min.js"></script><script src="https://cdn.jsdelivr.net/npm/paper@0.12.18/dist/paper-full.min.js"></script><script>window.animationTime=0;window.setAnimationTime=function(t){window.animationTime=t};const board=document.getElementById('board'),ctx=board.getContext('2d'),stage=document.getElementById('stage'),rc=rough.canvas(board);try{${safeCode}\nparent.postMessage({type:'athena-ready'},'*')}catch(error){ctx.fillStyle='#a78bfa';ctx.font='bold 32px Inter,sans-serif';ctx.fillText('Animation error: '+error.message,80,100);parent.postMessage({type:'athena-error',message:error.message},'*')}</script></body></html>`
 
   // Listen for iframe messages
   useEffect(() => {
@@ -81,6 +83,31 @@ export function AnimationPlayerSync({
     const active = beats.findLast((b) => b.time <= currentTime)
     setCurrentSubtitle(active?.subtitle ?? caption)
   }, [currentTime, beats, caption])
+
+  // Audio sync
+  useEffect(() => {
+    if (audioBase64 && audioRef.current && !audioRef.current.src.startsWith("data:audio/mp3;base64,")) {
+      audioRef.current.src = `data:audio/mp3;base64,${audioBase64}`
+    }
+  }, [audioBase64])
+
+  useEffect(() => {
+    if (!audioRef.current) return
+    if (isPlaying) {
+      audioRef.current.currentTime = currentTime
+      audioRef.current.playbackRate = speed
+      audioRef.current.play().catch(e => console.warn("Audio play blocked", e))
+    } else {
+      audioRef.current.pause()
+    }
+  }, [isPlaying, speed])
+
+  // Audio seeking
+  useEffect(() => {
+    if (audioRef.current && isPlaying && Math.abs(audioRef.current.currentTime - currentTime) > 0.5) {
+        audioRef.current.currentTime = currentTime
+    }
+  }, [currentTime, isPlaying])
 
   // Animation loop
   useEffect(() => {
@@ -168,11 +195,11 @@ export function AnimationPlayerSync({
       </div>
 
       {/* Canvas */}
-      <div className="relative aspect-video w-full overflow-hidden bg-[#0a0a0a]">
+      <div className={`relative w-full overflow-hidden bg-white ${isFullscreen ? 'flex-1' : 'aspect-video'}`}>
         {!iframeReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
             <div className="flex flex-col items-center gap-3">
-              <svg className="size-12 text-white" fill="none" viewBox="0 0 64 64">
+              <svg className="size-12 text-black" fill="none" viewBox="0 0 64 64">
                 <rect x="8" y="8" width="48" height="48" rx="6" stroke="currentColor" strokeWidth="1.5" transform="rotate(45 32 32)" opacity="0.15" />
                 <rect className="athena-loader-path" x="8" y="8" width="48" height="48" rx="6" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" transform="rotate(45 32 32)" pathLength="100" />
               </svg>

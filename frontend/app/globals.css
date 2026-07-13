@@ -195,6 +195,15 @@
   animation: athena-trace 1.4s linear infinite;
 }
 
+/* ─── ORBIT DOT ───────────────────────────────────────────────────── */
+@keyframes orbit-spin {
+  0%   { transform: rotate(0deg)   translateX(28px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(28px) rotate(-360deg); }
+}
+.orbit {
+  animation: orbit-spin 2s linear infinite;
+}
+
 /* ─── SKELETON SHIMMER ───────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { transform: translateX(-100%); }
