@@ -11,40 +11,174 @@ Athena is **ChatGPT for visual learning**. It works like a normal conversational
 - **Subtitle synchronization** with timing markers
 - **Educational context** for deep understanding
 
-## Quick Start
+## Installation & Setup Guide
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+
-- pnpm (or npm/yarn)
-- OpenRouter API key (for LLMs)
-- Sarvam AI API key (for text-to-speech)
+- **Python 3.10+** - Check with `python3 --version`
+- **Node.js 18+** - Check with `node --version`
+- **pnpm** - Install with `npm install -g pnpm` (or use npm/yarn)
+- **OpenRouter API key** - Get from [openrouter.ai](https://openrouter.ai)
+- **Sarvam AI API key** - Get from [sarvam.ai](https://sarvam.ai)
 
-### Setup
+### Step 1: Clone Repository
 
-1. **Clone and navigate to project:**
 ```bash
 git clone https://github.com/harshaxyZ/athena7.git
 cd athena7
 ```
 
-2. **Backend setup:**
+### Step 2: Backend Setup
+
 ```bash
+# Navigate to backend
 cd backend
+
+# Create Python virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+# On macOS/Linux:
+source venv/bin/activate
+# On Windows:
+venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Copy environment template
 cp .env.example .env
+
 # Edit .env with your API keys
+nano .env  # or use your favorite editor
+```
+
+**Required in `.backend/.env`:**
+```
+OPENROUTER_API_KEY=sk-or-v1-your-key-here
+OPENROUTER_MODEL=qwen/qwen-3-32b-instruct
+OPENROUTER_VISUAL_PLANNER_MODEL=anthropic/claude-opus-4.8
+OPENROUTER_VISUAL_GENERATOR_MODEL=anthropic/claude-sonnet-4.6
+
+SARVAM_API_KEY=your-sarvam-key-here
+SARVAM_TTS_MODEL=bulbul:v3
+SARVAM_DEFAULT_VOICE=shubh
+```
+
+### Step 3: Start Backend Server
+
+```bash
+# From backend directory (with venv activated)
 python -m uvicorn main:app --reload --port 8000
 ```
 
-3. **Frontend setup (new terminal):**
-```bash
-cd frontend
-pnpm install
-pnpm dev
-# Opens http://localhost:3000
+Expected output:
 ```
+INFO:     Uvicorn running on http://127.0.0.1:8000
+INFO:     Application startup complete
+```
+
+### Step 4: Frontend Setup (New Terminal)
+
+```bash
+# From project root
+cd frontend
+
+# Install dependencies
+pnpm install
+# (or use: npm install / yarn install)
+
+# Start development server
+pnpm dev
+```
+
+Expected output:
+```
+▲ Next.js 16.0.0
+- Local:        http://localhost:3000
+```
+
+### Step 5: Access Application
+
+Open [http://localhost:3000](http://localhost:3000) in your browser and start learning!
+
+## Troubleshooting
+
+### Backend Issues
+
+**ModuleNotFoundError: No module named 'fastapi'**
+```bash
+# Make sure venv is activated
+source backend/venv/bin/activate  # or: venv\Scripts\activate on Windows
+pip install -r requirements.txt
+```
+
+**Port 8000 already in use**
+```bash
+# Kill process on port 8000
+lsof -ti:8000 | xargs kill -9  # macOS/Linux
+netstat -ano | findstr :8000    # Windows
+
+# Or use a different port
+python -m uvicorn main:app --port 8001
+```
+
+**API Key errors (401 Unauthorized)**
+- Verify OpenRouter API key is valid and active
+- Go to [openrouter.ai/account](https://openrouter.ai/account) to check
+- Generate a new key if needed
+- Update `.env` and restart backend
+
+**ImportError from backend.main**
+- Make sure you're running from project root: `cd /path/to/athena7`
+- Run: `python -m uvicorn backend.main:app --reload --port 8000`
+
+### Frontend Issues
+
+**Port 3000 already in use**
+```bash
+# Kill process on port 3000
+lsof -ti:3000 | xargs kill -9    # macOS/Linux
+netstat -ano | findstr :3000      # Windows
+
+# Or specify different port
+pnpm dev -- -p 3001
+```
+
+**pnpm: command not found**
+```bash
+# Install pnpm globally
+npm install -g pnpm
+
+# Or use npm instead
+npm install
+npm run dev
+```
+
+**Cannot GET http://localhost:3000**
+- Wait 30 seconds for frontend to build
+- Check terminal for build errors
+- Clear `.next` folder and restart: `rm -rf .next && pnpm dev`
+
+### Animation Generation Issues
+
+**"Animation failed - Failed to fetch"**
+1. Check backend is running: `curl http://localhost:8000/docs`
+2. Check backend logs for error messages
+3. Verify OpenRouter API key is valid
+4. Check Claude Opus 4.8 and Sonnet 4-6 models are available on OpenRouter
+
+**"User not found" (401 error)**
+- Your OpenRouter API key is invalid or revoked
+- Generate a new key from [openrouter.ai](https://openrouter.ai)
+- Update `backend/.env` with new key
+- Restart backend server
+
+**TTS Audio not playing**
+- Verify Sarvam API key in `.env`
+- Check browser console for audio errors
+- Try refreshing page
+- Test with different browser (Chrome recommended)
 
 ## Workflow
 

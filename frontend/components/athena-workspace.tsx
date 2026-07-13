@@ -636,7 +636,7 @@ export function AthenaWorkspace() {
                     submit()
                   }
                 }}
-                className="max-h-44 min-h-[3.5rem] w-full resize-none bg-transparent px-4 py-3.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/50"
+                className="max-h-24 min-h-[2.5rem] w-full resize-none bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/50"
                 placeholder={`Ask anything \u2014 \u201cHow does a black hole form?\u201d or paste your notes\u2026`}
               />
               <div className="flex items-center justify-between gap-2 px-2 pb-2">

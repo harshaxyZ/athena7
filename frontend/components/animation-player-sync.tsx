@@ -88,12 +88,13 @@ export function AnimationPlayerSync({
   // Audio playback sync with animation
   useEffect(() => {
     if (!audioRef.current) return
+    audioRef.current.volume = isMuted ? 0 : 1
     if (isPlaying) {
       audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e.message))
     } else {
       audioRef.current.pause()
     }
-  }, [isPlaying])
+  }, [isPlaying, isMuted])
 
   // Subtitle sync
   useEffect(() => {
@@ -311,7 +312,6 @@ export function AnimationPlayerSync({
       <audio 
         ref={audioRef} 
         className="hidden" 
-        volume={isMuted ? 0 : 1}
         crossOrigin="anonymous"
         onEnded={() => onPartEnd?.()} 
       />
