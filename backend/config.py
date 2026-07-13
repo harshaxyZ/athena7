@@ -3,8 +3,8 @@ from dotenv import load_dotenv
 import os
 from pathlib import Path
 
-# Load .env from project root
-env_path = Path(__file__).parent.parent / ".env"
+# Load backend-local secrets so the service can run independently.
+env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path)
 
 
@@ -32,6 +32,7 @@ class Settings:
     LLM_MAX_CONCURRENT: int = 5
     LLM_TIMEOUT_SECONDS: int = int(os.getenv("LLM_TIMEOUT_SECONDS", "120"))
     VISUAL_MAX_CONCURRENT: int = int(os.getenv("VISUAL_MAX_CONCURRENT", "5"))
+    FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 
     # ── Cost ───────────────────────────────────────────────────────
     USD_TO_INR: float = float(os.getenv("USD_TO_INR", "83.5"))

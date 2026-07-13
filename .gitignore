@@ -6,11 +6,28 @@ __v0_jsx-dev-runtime.ts
 .v0-trash/
 .vercel/
 
-# Environment variables
+# Environment variables (templates remain tracked)
 .env
 .env*.local
+!.env.example
 
-# Common ignores
-node_modules
+# Dependencies and build output
+node_modules/
+**/node_modules/
 .next/
+**/.next/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+
+# Generated Athena data
+backend/uploads/*
+backend/lessons/*
+backend/conversations/*
+!backend/uploads/.gitkeep
+!backend/lessons/.gitkeep
+!backend/conversations/.gitkeep
+
+# OS files
 .DS_Store
