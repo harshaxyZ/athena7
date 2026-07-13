@@ -80,6 +80,22 @@ export function AthenaWorkspace() {
   const [generationStep, setGenerationStep] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [submittedPrompt, setSubmittedPrompt] = useState("")
+  
+  // Generate a short session name from the prompt
+  const getSessionName = (prompt: string) => {
+    if (!prompt) return "New lesson"
+    const keywords = ["black hole", "heart", "photosynthesis", "DNA", "gravity", "quantum", "star", "immune", "neuron", "atom"]
+    for (const keyword of keywords) {
+      if (prompt.toLowerCase().includes(keyword)) {
+        return `lesson on ${keyword}`
+      }
+    }
+    // Fallback: use first few words
+    const words = prompt.split(" ").slice(0, 2).join(" ")
+    return `learning: ${words}...`
+  }
+  
+  const sessionName = getSessionName(submittedPrompt)
   const [response, setResponse] = useState("")
   const [status, setStatus] = useState("")
   const [animationParts, setAnimationParts] = useState<AnimationData[]>([])
@@ -255,7 +271,7 @@ export function AthenaWorkspace() {
             )}
             <div className="ml-1 min-w-0">
               <p className="truncate text-sm font-semibold">
-                {submittedPrompt || "New visual conversation"}
+                {submittedPrompt ? sessionName : "New visual conversation"}
               </p>
               <p className="hidden text-[11px] text-muted-foreground sm:block">
                 Interactive learning session

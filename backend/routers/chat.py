@@ -214,8 +214,9 @@ async def chat_message(
                     
                     yield f"data: {json.dumps({'type': 'status', 'content': ''})}\n\n"
                 except Exception as exc:
-                    logger.warning("Animation generation failed: %s", exc)
-                    yield f"data: {json.dumps({'type': 'animation_error', 'content': str(exc)})}\n\n"
+                    logger.error("Animation generation failed: %s", exc, exc_info=True)
+                    error_msg = f"Animation generation failed: {str(exc)}"
+                    yield f"data: {json.dumps({'type': 'animation_error', 'content': error_msg})}\n\n"
                     yield f"data: {json.dumps({'type': 'status', 'content': ''})}\n\n"
 
             # Generate TTS if non-English
