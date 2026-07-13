@@ -10,17 +10,18 @@ export function AthenaLogo({ className }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        d="M16 3.5 27 10v12L16 28.5 5 22V10L16 3.5Z"
+        d="M4.5 7.25c4.4 0 8.23 1.22 11.5 3.66 3.27-2.44 7.1-3.66 11.5-3.66v16.2c-4.28 0-8.11 1.1-11.5 3.3-3.39-2.2-7.22-3.3-11.5-3.3V7.25Z"
         stroke="currentColor"
+        strokeLinejoin="round"
         strokeWidth="1.8"
       />
+      <path d="M16 10.91v15.84" stroke="currentColor" strokeWidth="1.8" />
       <path
-        d="m9.25 12.2 6.75-4 6.75 4v7.6l-6.75 4-6.75-4v-7.6Z"
+        d="m12.15 15.15 6.7 3.85-6.7 3.85v-7.7Z"
+        fill="currentColor"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeLinejoin="round"
       />
-      <path d="m9.25 12.2 13.5 7.6M22.75 12.2 9.25 19.8M16 8.2v15.6" stroke="currentColor" strokeWidth="1.4" />
-      <circle cx="16" cy="16" fill="currentColor" r="2.25" />
     </svg>
   )
 }

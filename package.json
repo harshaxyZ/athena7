@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently --kill-others --names backend,frontend --prefix-colors cyan,white \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "dev": "next dev --hostname 0.0.0.0 --port 3000",
+    "dev:full": "concurrently --kill-others --names backend,frontend --prefix-colors cyan,white \"pnpm dev:backend\" \"pnpm dev:frontend\"",
     "dev:backend": "uv run --with-requirements backend/requirements.txt uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload",
     "dev:frontend": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
