@@ -1,0 +1,18 @@
+[project]
+name = "athena-backend"
+version = "1.4.0"
+description = "Athena FastAPI visual learning backend"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi[standard]>=0.115.0,<1.0.0",
+  "python-dotenv>=1.0.1,<2.0.0",
+  "openai>=1.51.0,<2.0.0",
+  "httpx>=0.27.2,<1.0.0",
+  "pymupdf>=1.26.0,<2.0.0",
+  "pdfplumber>=0.11.4,<1.0.0",
+  "python-multipart>=0.0.12,<1.0.0",
+  "networkx>=3.3,<4.0",
+  "pydantic>=2.9.2,<3.0.0",
+  "aiofiles>=24.1.0,<25.0.0",
+  "redis>=5.1.1,<6.0.0"
+]

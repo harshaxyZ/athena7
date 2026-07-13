@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react"
 import { AnimationPlayer } from "@/components/animation-player"
-import { AthenaLogo } from "@/components/athena-logo"
+import { AthenaLoader, AthenaLogo } from "@/components/athena-logo"
 import { getBackendHealth } from "@/lib/athena-api"
 
 const chats = [
@@ -138,12 +138,12 @@ export function AthenaWorkspace() {
           <div className="flex items-center gap-1.5 md:gap-2">
             <div
               className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-[11px] sm:flex"
-              title={backendError ? "FastAPI on port 8000 is unreachable" : backend ? `${backend.service} v${backend.version}` : "Checking FastAPI on port 8000"}
+              title={backendError ? "Athena backend service is unreachable" : backend ? `${backend.service} v${backend.version}` : "Checking Athena backend service"}
               role="status"
             >
               <span className={`size-2 rounded-full ${backend ? "bg-primary" : backendError ? "bg-destructive" : "animate-pulse bg-muted-foreground"}`} />
               <span className="font-medium">{backend ? "Backend live" : backendError ? "Backend offline" : backendLoading ? "Connecting" : "Checking"}</span>
-              <span className="hidden text-muted-foreground md:inline">:8000</span>
+              <span className="hidden text-muted-foreground md:inline">/backend</span>
             </div>
             <div className="hidden items-center gap-3 rounded-xl border border-border bg-card px-3 py-1.5 lg:flex">
               <div><p className="text-[9px] uppercase tracking-wider text-muted-foreground">Tokens</p><p className="font-mono text-xs">2,482</p></div>
@@ -184,7 +184,7 @@ export function AthenaWorkspace() {
                     <div className="flex h-full flex-col justify-between">
                       <div className="flex items-center justify-between"><span className="rounded-full border border-black/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[.16em]">Creating visual story</span><span className="font-mono text-xs text-black/55">{elapsed}s</span></div>
                       <div className="mx-auto flex max-w-md flex-col items-center gap-5 text-center">
-                        <span className="relative flex size-16 items-center justify-center rounded-full border border-black/10"><Sparkles className="size-6" /><span className="absolute inset-0 animate-ping rounded-full border border-black/10" /></span>
+                        <AthenaLoader />
                         <div><h3 className="text-balance text-xl font-semibold tracking-tight md:text-3xl">{generationSteps[generationStep]}</h3><p className="mt-2 text-sm text-black/55">Designing a smooth, narrated journey through the science.</p></div>
                       </div>
                       <div><div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-black/50"><span>Scene {Math.min(3, generationStep + 1)} of 3</span><span>Ready in about {secondsLeft}s</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-[#121212] transition-[width] duration-500" style={{ width: `${Math.min(96, 10 + elapsed * 9)}%` }} /></div></div>

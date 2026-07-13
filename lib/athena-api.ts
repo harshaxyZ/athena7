@@ -14,13 +14,13 @@ export type UsageSummary = {
 }
 
 export async function getBackendHealth(): Promise<BackendHealth> {
-  const response = await fetch("/backend-health", { cache: "no-store" })
+  const response = await fetch("/backend/health", { cache: "no-store" })
   if (!response.ok) throw new Error(`Backend unavailable (${response.status})`)
   return response.json()
 }
 
 export async function getGlobalUsage(): Promise<UsageSummary> {
-  const response = await fetch("/api/tokens/global", { cache: "no-store" })
+  const response = await fetch("/backend/api/tokens/global", { cache: "no-store" })
   if (!response.ok) throw new Error(`Usage unavailable (${response.status})`)
   return response.json()
 }

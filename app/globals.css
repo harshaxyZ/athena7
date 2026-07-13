@@ -139,6 +139,17 @@
   .metric-card strong { @apply truncate font-mono text-xs font-medium; }
 }
 
+@keyframes athena-triangle-trace {
+  0% { stroke-dashoffset: 100; }
+  50% { stroke-dashoffset: 25; }
+  100% { stroke-dashoffset: -50; }
+}
+
+.athena-loader-path {
+  stroke-dasharray: 24 76;
+  animation: athena-triangle-trace 1.4s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

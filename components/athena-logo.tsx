@@ -10,18 +10,28 @@ export function AthenaLogo({ className }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        d="M4.5 7.25c4.4 0 8.23 1.22 11.5 3.66 3.27-2.44 7.1-3.66 11.5-3.66v16.2c-4.28 0-8.11 1.1-11.5 3.3-3.39-2.2-7.22-3.3-11.5-3.3V7.25Z"
+        d="M16 3.75 28.25 26.5H3.75L16 3.75Z"
         stroke="currentColor"
         strokeLinejoin="round"
-        strokeWidth="1.8"
+        strokeWidth="2"
       />
-      <path d="M16 10.91v15.84" stroke="currentColor" strokeWidth="1.8" />
       <path
-        d="m12.15 15.15 6.7 3.85-6.7 3.85v-7.7Z"
-        fill="currentColor"
+        d="M11.2 21.25h9.6"
         stroke="currentColor"
-        strokeLinejoin="round"
+        strokeLinecap="round"
+        strokeWidth="2"
       />
     </svg>
+  )
+}
+
+export function AthenaLoader({ className }: { className?: string }) {
+  return (
+    <span className={cn("relative block size-16", className)} role="status" aria-label="Athena is creating">
+      <svg className="size-full" fill="none" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M32 7 57 54H7L32 7Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="2" opacity="0.18" />
+        <path className="athena-loader-path" d="M32 7 57 54H7L32 7Z" pathLength="100" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+      </svg>
+    </span>
   )
 }
