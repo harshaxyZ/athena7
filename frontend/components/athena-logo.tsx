@@ -3,40 +3,40 @@
 import { cn } from "@/lib/utils"
 
 /**
- * Athena logo — a clean geometric mark.
- * Two concentric squares rotated 45 degrees (diamond) with a centre dot.
- * Pure currentColor so it inherits white in dark mode, black in light.
+ * Athena logo — an elegant owl head mark symbolizing wisdom and learning.
+ * Minimalist, modern, works in both light and dark modes.
  */
 export function AthenaLogo({ className }: { className?: string }) {
   return (
     <svg
       aria-label="Athena"
       className={cn("size-7", className)}
-      fill="none"
+      fill="currentColor"
       viewBox="0 0 32 32"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* outer diamond */}
-      <rect
-        x="4" y="4" width="24" height="24"
-        rx="3"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        transform="rotate(45 16 16)"
-        fill="none"
-      />
-      {/* inner diamond — slightly smaller, same centre */}
-      <rect
-        x="8.5" y="8.5" width="15" height="15"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="1"
-        transform="rotate(45 16 16)"
-        fill="currentColor"
-        fillOpacity="0.08"
-      />
-      {/* centre dot */}
-      <circle cx="16" cy="16" r="2" fill="currentColor" />
+      {/* Head circle - subtle background */}
+      <circle cx="16" cy="14" r="9" fill="currentColor" opacity="0.06" />
+      
+      {/* Left eye */}
+      <circle cx="11.5" cy="13" r="2.5" fill="currentColor" />
+      <circle cx="12.2" cy="12.2" r="0.8" fill="currentColor" opacity="0.3" />
+      
+      {/* Right eye */}
+      <circle cx="20.5" cy="13" r="2.5" fill="currentColor" />
+      <circle cx="21.2" cy="12.2" r="0.8" fill="currentColor" opacity="0.3" />
+      
+      {/* Beak - small triangle */}
+      <polygon points="16,18 15,16 17,16" fill="currentColor" opacity="0.7" />
+      
+      {/* Left wing arc */}
+      <path d="M 8 14 Q 6 18 8 22" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.4" />
+      
+      {/* Right wing arc */}
+      <path d="M 24 14 Q 26 18 24 22" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.4" />
+      
+      {/* Bottom knowledge glow */}
+      <path d="M 13 23 Q 16 25 19 23" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.25" />
     </svg>
   )
 }

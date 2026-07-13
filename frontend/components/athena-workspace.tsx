@@ -37,11 +37,7 @@ const chats = [
   { title: "Why monsoons form", time: "Mon" },
 ]
 
-const prompts = [
-  { icon: Atom,        label: "Quantum entanglement", detail: "Follow two particles across space" },
-  { icon: FlaskConical, label: "CRISPR gene editing",   detail: "Step inside a living cell"        },
-  { icon: BookOpen,    label: "The Indian monsoon",    detail: "Fly with the seasonal winds"       },
-]
+
 
 const generationSteps = [
   "Reading your question",
@@ -285,18 +281,98 @@ export function AthenaWorkspace() {
         <div className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
           {!started ? (
             /* ── LANDING ─────────────────────────────────────────── */
-            <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-4 py-12 md:px-8">
-              <motion.div
-                className="mb-10 flex max-w-3xl flex-col gap-6"
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              >
-                {/* Logo lockup */}
-                <div className="flex items-center gap-3">
-                  <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-card">
-                    <AthenaLogo className="size-7" />
+            <div className="relative min-h-full overflow-hidden">
+              {/* Animated background gradient */}
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -top-40 left-1/3 h-80 w-80 rounded-full bg-foreground/5 blur-3xl" />
+                <div className="absolute -bottom-40 right-1/4 h-96 w-96 rounded-full bg-foreground/4 blur-3xl" />
+              </div>
+
+              <div className="relative mx-auto flex min-h-full max-w-3xl flex-col justify-center px-4 py-16 md:px-8 md:py-24">
+                <motion.div
+                  className="flex flex-col gap-8"
+                  initial={{ opacity: 0, y: 32 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {/* Logo badge */}
+                  <motion.div
+                    className="flex w-fit items-center gap-2 rounded-full border border-border bg-card px-4 py-2 backdrop-blur-sm transition-all hover:border-foreground/30 hover:bg-card/80"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <div className="flex size-8 items-center justify-center rounded-full bg-foreground/8">
+                      <AthenaLogo className="size-4" />
+                    </div>
+                    <span className="text-xs font-semibold tracking-wide">Athena</span>
+                    <span className="text-xs text-muted-foreground">AI Learning</span>
+                  </motion.div>
+
+                  {/* Main headline */}
+                  <div>
+                    <h1 className="text-balance text-5xl font-bold tracking-[-0.02em] leading-[1.15] md:text-7xl">
+                      Learn through{" "}
+                      <motion.span
+                        className="relative inline-block"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.3, duration: 0.6 }}
+                      >
+                        <span className="absolute -inset-2 blur-xl bg-foreground/10" />
+                        <span className="relative">motion.</span>
+                      </motion.span>
+                    </h1>
                   </div>
+
+                  {/* Subtitle */}
+                  <motion.p
+                    className="max-w-2xl text-lg leading-relaxed text-muted-foreground md:text-xl"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.6 }}
+                  >
+                    Upload documents. Ask questions. Watch concepts transform into stunning cinematic explanations in seconds. Powered by Claude Sonnet 4.6.
+                  </motion.p>
+
+                  {/* Stats/features grid */}
+                  <motion.div
+                    className="mt-6 grid gap-3 sm:grid-cols-3"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4, duration: 0.6 }}
+                  >
+                    {[
+                      { label: "S-tier animations", value: "Canvas + GSAP" },
+                      { label: "Precise narration", value: "Real-time sync" },
+                      { label: "Any topic", value: "Zero limits" },
+                    ].map(({ label, value }) => (
+                      <motion.div
+                        key={label}
+                        className="group rounded-xl border border-border bg-card p-4 transition-all hover:border-foreground/40 hover:bg-accent"
+                        whileHover={{ y: -2 }}
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
+                          {label}
+                        </p>
+                        <p className="mt-1.5 text-sm font-medium">{value}</p>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+
+                  {/* CTA hint */}
+                  <motion.div
+                    className="mt-8 flex items-center gap-3 text-xs text-muted-foreground"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6, duration: 0.6 }}
+                  >
+                    <div className="h-px flex-1 bg-border" />
+                    <span>Start typing or upload a file above</span>
+                    <div className="h-px flex-1 bg-border" />
+                  </motion.div>
+                </motion.div>
+              </div>
+            </div>
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.22em] text-foreground">Athena</p>
                     <p className="text-sm text-muted-foreground">AI Learning Platform</p>
@@ -338,29 +414,7 @@ export function AthenaWorkspace() {
                 </motion.div>
               </motion.div>
 
-              {/* Prompt chips */}
-              <div className="grid gap-3 md:grid-cols-3">
-                {prompts.map(({ icon: Icon, label, detail }, i) => (
-                  <motion.button
-                    key={label}
-                    onClick={() => setInput(`Teach me ${label.toLowerCase()} with a cinematic animation`)}
-                    className="prompt-chip"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.28 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <span className="rounded-xl border border-border bg-accent p-2.5">
-                      <Icon className="size-5 text-foreground" />
-                    </span>
-                    <span className="min-w-0 text-left">
-                      <span className="block text-sm font-semibold leading-snug">{label}</span>
-                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{detail}</span>
-                    </span>
-                  </motion.button>
-                ))}
-              </div>
+
             </div>
           ) : (
             /* ── CONVERSATION ────────────────────────────────────── */
