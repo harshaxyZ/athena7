@@ -9,10 +9,10 @@ load_dotenv(env_path)
 
 
 class Settings:
-    # ── OpenRouter / GLM-5.2 ───────────────────────────────────────
+    # ── OpenRouter / Qwen3 (General Chat) ──────────────────────────
     OPENROUTER_ENDPOINT: str = os.getenv("OPENROUTER_ENDPOINT", "https://openrouter.ai/api/v1")
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
-    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "z-ai/glm-5.2")
+    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "qwen/qwen-3-32b-instruct")
     OPENROUTER_FALLBACK_MODEL: str = os.getenv("OPENROUTER_FALLBACK_MODEL", "google/gemini-2.5-flash")
     
     # ── Claude Models for Visual Generation ──────────────────────
