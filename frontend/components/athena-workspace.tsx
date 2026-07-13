@@ -30,17 +30,35 @@ import { AthenaLogo } from "@/components/athena-logo"
 const chats: { title: string; time: string }[] = []
 
 // Complex prompts for learning - shown when clicking "Generate Idea"
+// Organized by subject: Physics/Space (5), Mathematics (5), Chemistry (5), Biology (5)
 const complexPrompts = [
-  "Explain how photosynthesis works in plants, visualize it with the electron transport chain and show me the ATP production step by step. Animate the light-dependent reactions occurring in the thylakoid membrane.",
-  "Show me how machine learning neural networks learn through backpropagation. Visualize the gradient descent algorithm and animate how weights update during training on a simple dataset.",
-  "Explain the water cycle with focus on evapotranspiration, condensation, and precipitation. Animate how water molecules move through each stage with detailed molecular interactions.",
-  "Visualize how DNA replication works, show the role of DNA polymerase, primase, and helicase. Animate the leading and lagging strand synthesis simultaneously.",
-  "Show me how the Fourier transform works mathematically. Visualize how complex signals decompose into sine waves and animate the frequency domain representation.",
-  "Explain quantum entanglement with visual animations. Show how entangled particles behave and why measuring one instantly affects the other.",
-  "Animate the life cycle of a star from birth to death. Show the Hertzsprung-Russell diagram and how stars evolve over billions of years.",
-  "Visualize how a transistor works at the semiconductor level. Animate electrons flowing through p-n junctions and show how it acts as a switch.",
-  "Explain the theory of plate tectonics. Animate continental drift, subduction zones, and the formation of mountains and oceanic trenches.",
-  "Show me how the human immune system fights infections. Animate antibodies binding to antigens and the complement cascade activation.",
+  // === PHYSICS & SPACE (5) ===
+  "Explain how a black hole forms from a dying star and visualize the event horizon, accretion disk, and gravitational lensing effect. Show how spacetime is curved and animate matter spiraling into the singularity with spaghettification forces.",
+  "Explain the life cycle of a star from birth through fusion to supernova explosion. Visualize the Hertzsprung-Russell diagram showing stellar evolution and animate the transformation from red giant to white dwarf or neutron star.",
+  "Show me how quantum entanglement works and why measuring one particle instantly affects its entangled partner. Visualize the EPR paradox and animate how information appears to travel faster than light without violating relativity.",
+  "Explain how electromagnetic waves propagate through space with oscillating electric and magnetic fields perpendicular to each other. Visualize the entire EM spectrum from radio waves to gamma rays and show wavelength differences.",
+  "Show Newton's three laws of motion with visual examples of gravity keeping planets in orbit. Animate gravitational force between celestial bodies and how planetary motion follows elliptical paths around the sun.",
+
+  // === MATHEMATICS (5) ===
+  "Show me how the Fourier transform converts time-domain signals into frequency-domain and why it's used in music, imaging, and signal processing. Visualize complex periodic functions decomposing into sine waves and animate the transformation.",
+  "Explain the Mandelbrot set and Julia sets with fractal geometry. Visualize how fractals are generated using complex number iteration and animate zooming into self-similar patterns at different scales showing infinite complexity.",
+  "Show how calculus derives the instantaneous rate of change using limits and derivatives. Animate a tangent line moving along a curve and visualize how the slope changes as the tangent point moves.",
+  "Visualize different geometric proofs of the Pythagorean theorem. Animate squares and triangles to demonstrate why a² + b² = c² and show multiple proof methods.",
+  "Explain linear algebra and matrix transformations in 2D space. Visualize vectors being rotated, scaled, and translated by matrices and animate how composition of transformations works.",
+
+  // === CHEMISTRY (5) ===
+  "Visualize how atoms bond through covalent, ionic, and metallic bonding mechanisms. Show electron orbital interactions and animate the formation of molecular structures with electron sharing or transfer.",
+  "Explain photosynthesis at the molecular level showing light-dependent reactions in thylakoid membranes. Visualize electron transport chains and animate how photons excite electrons to produce ATP and NADPH.",
+  "Show the structure of the periodic table and explain how elements are organized by atomic number and electron configuration. Animate electron orbitals filling up and visualize chemical properties changing across periods and groups.",
+  "Explain oxidation-reduction reactions and electron transfer between atoms. Visualize which atoms are oxidized and reduced, animate electron flow between reactants and products.",
+  "Show how chemical equilibrium works and Le Chatelier's principle in action. Visualize reactions reaching equilibrium and animate how the system responds when concentration, temperature, or pressure changes.",
+
+  // === BIOLOGY & BODY WORKFLOWS (5) ===
+  "Explain the human heart anatomy and how it pumps blood through the circulatory system. Visualize the four chambers, valves, and blood flow through arteries and veins. Animate a complete heartbeat cycle showing electrical signals triggering muscle contraction and valve opening/closing.",
+  "Show how DNA replication works at the molecular level with helicase unwinding the double helix. Visualize DNA polymerase adding nucleotides and animate the leading and lagging strand synthesis occurring simultaneously with Okazaki fragments.",
+  "Explain how the human immune system fights infections using lymphocytes, antibodies, and the complement cascade. Animate white blood cells identifying pathogens, T-cells attacking infected cells, and antibodies neutralizing viruses.",
+  "Visualize cellular respiration in mitochondria and photosynthesis in chloroplasts side by side. Show electron transport chains in both organelles and animate ATP synthesis occurring as protons flow through ATP synthase.",
+  "Explain nervous system signal transmission through neurons and synaptic communication. Visualize action potentials traveling along axons, animate synaptic transmission with neurotransmitter release, and show how signals propagate across synapses to the next neuron.",
 ]
 
 const generationSteps = [
