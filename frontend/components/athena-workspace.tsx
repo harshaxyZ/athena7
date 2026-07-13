@@ -29,7 +29,19 @@ import { AthenaLogo } from "@/components/athena-logo"
 // Empty chats - fresh start for all users
 const chats: { title: string; time: string }[] = []
 
-
+// Complex prompts for learning - shown when clicking "Generate Idea"
+const complexPrompts = [
+  "Explain how photosynthesis works in plants, visualize it with the electron transport chain and show me the ATP production step by step. Animate the light-dependent reactions occurring in the thylakoid membrane.",
+  "Show me how machine learning neural networks learn through backpropagation. Visualize the gradient descent algorithm and animate how weights update during training on a simple dataset.",
+  "Explain the water cycle with focus on evapotranspiration, condensation, and precipitation. Animate how water molecules move through each stage with detailed molecular interactions.",
+  "Visualize how DNA replication works, show the role of DNA polymerase, primase, and helicase. Animate the leading and lagging strand synthesis simultaneously.",
+  "Show me how the Fourier transform works mathematically. Visualize how complex signals decompose into sine waves and animate the frequency domain representation.",
+  "Explain quantum entanglement with visual animations. Show how entangled particles behave and why measuring one instantly affects the other.",
+  "Animate the life cycle of a star from birth to death. Show the Hertzsprung-Russell diagram and how stars evolve over billions of years.",
+  "Visualize how a transistor works at the semiconductor level. Animate electrons flowing through p-n junctions and show how it acts as a switch.",
+  "Explain the theory of plate tectonics. Animate continental drift, subduction zones, and the formation of mountains and oceanic trenches.",
+  "Show me how the human immune system fights infections. Animate antibodies binding to antigens and the complement cascade activation.",
+]
 
 const generationSteps = [
   "Reading your question",
@@ -607,10 +619,14 @@ export function AthenaWorkspace() {
                   </button>
                   <button
                     className="composer-button"
-                    onClick={() => setInput("Animate how a black hole forms and warps spacetime with dramatic effects")}
-                    aria-label="Try an example"
+                    onClick={() => {
+                      const randomPrompt = complexPrompts[Math.floor(Math.random() * complexPrompts.length)]
+                      setInput(randomPrompt)
+                    }}
+                    aria-label="Generate random learning prompt"
+                    title="Generate a random complex prompt to learn from"
                   >
-                    <WandSparkles />
+                    <Sparkles />
                   </button>
                   {attachment ? (
                     <span className="flex min-w-0 items-center gap-1.5 rounded-lg border border-border bg-accent px-2.5 py-1 text-[11px] font-medium text-foreground">
