@@ -184,6 +184,7 @@ async def chat_message(
                     yield f"data: {json.dumps({'type': 'status', 'content': 'Planning the visual story'})}\n\n"
                     from backend.agents.visual_generator import generate_multipart_animations
                     multipart_data = await generate_multipart_animations(topic=message, full_explanation=full_response, session_id=conversation_id)
+                    animation_data = multipart_data  # Capture for saving to message
                     
                     # Stream first part immediately
                     if multipart_data.get("parts"):
