@@ -18,13 +18,14 @@ logging.basicConfig(
 app = FastAPI(
     title="Athena AI Learning Platform",
     description="AI-powered visual learning for Indian students",
-    version="1.4.0",
+    version="2.2.0",
 )
 
-# CORS
+# CORS — support comma-separated origins
+_cors_origins = [o.strip() for o in settings.FRONTEND_ORIGIN.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_ORIGIN],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,7 +43,7 @@ app.include_router(narration.router)
 async def root():
     return {
         "name": "Athena AI Learning Platform",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "status": "running",
     }
 

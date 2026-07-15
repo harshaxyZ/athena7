@@ -17,11 +17,14 @@ const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").rep
 
 export type Beat = { time: number; action: string; objects: string; camera: string; narration: string; subtitle: string }
 export type AnimationData = {
-  type: "js_scene"
-  code: string
-  topic: string
-  caption: string
-  duration: number
+  type: "js_scene" | "scene"
+  code?: string
+  scene_json?: Record<string, unknown>
+  topic?: string
+  caption?: string
+  narration?: string
+  duration?: number
+  total_duration?: number
   beats?: Beat[]
   audio_base64?: string
   voice_id?: string
@@ -34,15 +37,17 @@ export type ChatEvent =
   | { type: "status"; content: string }
   | { type: "animation"; data: AnimationData }
   | { type: "animation_part"; data: AnimationData }
+  | { type: "scene"; data: AnimationData }
   | { type: "animation_error" | "error"; content: string }
   | { type: "cost"; data: UsageSummary }
   | { type: "done"; conversation_id: string }
 
-export async function streamChat(input: { message: string; conversationId?: string; file?: File; signal?: AbortSignal; onEvent: (event: ChatEvent) => void }) {
+export async function streamChat(input: { message: string; conversationId?: string; file?: File; voice?: string; language?: string; signal?: AbortSignal; onEvent: (event: ChatEvent) => void }) {
   const body = new FormData()
   body.set("message", input.message)
   body.set("conversation_id", input.conversationId ?? "")
-  body.set("language", "en-IN")
+  body.set("language", input.language ?? "en-IN")
+  body.set("voice", input.voice ?? "")
   if (input.file) body.set("file", input.file)
   const response = await fetch(`${API_URL}/api/chat`, { method: "POST", body, signal: input.signal })
   if (!response.ok || !response.body) throw new Error(`Athena backend unavailable (${response.status})`)
@@ -82,4 +87,30 @@ export async function getGlobalUsage(): Promise<UsageSummary> {
   const response = await fetch(`${API_URL}/api/tokens/global`, { cache: "no-store" })
   if (!response.ok) throw new Error(`Usage unavailable (${response.status})`)
   return response.json()
+}
+
+export type ConversationSummary = {
+  conversation_id: string
+  title: string
+  language: string
+  created_at: number
+  updated_at: number
+  message_count: number
+}
+
+export async function getConversations(): Promise<ConversationSummary[]> {
+  const response = await fetch(`${API_URL}/api/chat/conversations`, { cache: "no-store" })
+  if (!response.ok) return []
+  const data = await response.json()
+  return data.conversations ?? []
+}
+
+export async function getConversation(conversationId: string) {
+  const response = await fetch(`${API_URL}/api/chat/conversations/${conversationId}`, { cache: "no-store" })
+  if (!response.ok) return null
+  return response.json()
+}
+
+export async function deleteConversation(conversationId: string) {
+  await fetch(`${API_URL}/api/chat/conversations/${conversationId}`, { method: "DELETE" })
 }

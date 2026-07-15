@@ -13,6 +13,7 @@ import {
   VolumeX,
 } from "lucide-react"
 import type { AnimationData, Beat } from "@/lib/athena-api"
+import { renderScene } from "@/lib/scene-renderer"
 
 // Extend Window for sandboxed iframe bridge
 declare global {
@@ -22,7 +23,8 @@ declare global {
 }
 
 type AnimationPlayerSyncProps = {
-  code: string
+  code?: string
+  sceneJSON?: Record<string, unknown>
   topic: string
   caption: string
   duration?: number
@@ -32,10 +34,15 @@ type AnimationPlayerSyncProps = {
   total_parts?: number
   onPartEnd?: () => void
   autoPlay?: boolean
+  voice?: string
+  language?: string
+  onVoiceChange?: (voice: string) => void
+  onLanguageChange?: (lang: string) => void
 }
 
 export function AnimationPlayerSync({
   code,
+  sceneJSON,
   topic,
   caption,
   duration = 14,
@@ -45,6 +52,10 @@ export function AnimationPlayerSync({
   total_parts = 1,
   onPartEnd,
   autoPlay = true,
+  voice = "shubh",
+  language = "en-IN",
+  onVoiceChange,
+  onLanguageChange,
 }: AnimationPlayerSyncProps) {
   const [isPlaying, setIsPlaying] = useState(autoPlay)
   const [currentTime, setCurrentTime] = useState(0)
@@ -57,31 +68,87 @@ export function AnimationPlayerSync({
   const [iframeReady, setIframeReady] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const animationFrameRef = useRef<number | undefined>(undefined)
+  const rendererRef = useRef<{ stop: () => void } | null>(null)
   const startTimeRef = useRef<number>(Date.now() - currentTime * 1000)
 
-  const safeCode = code.replace(/<\/script/gi, "<\\/script")
+  const safeCode = (code || "").replace(/<\/script/gi, "<\\/script")
   const sandboxDocument = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'unsafe-inline';"><style>*{box-sizing:border-box}html,body,#stage{margin:0;width:100%;height:100%;overflow:hidden;background:#0f0f1e}canvas{width:100%;height:100%;display:block}</style></head><body><div id="stage"><canvas id="board" width="1600" height="900"></canvas></div><script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script><script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script><script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script><script src="https://cdn.jsdelivr.net/npm/p5@1.11.8/lib/p5.min.js"></script><script src="https://cdn.jsdelivr.net/npm/fabric@6.7.1/dist/index.min.js"></script><script src="https://cdn.jsdelivr.net/npm/paper@0.12.18/dist/paper-full.min.js"></script><script>window.animationTime=0;window.setAnimationTime=function(t){window.animationTime=t};const board=document.getElementById('board'),ctx=board.getContext('2d'),stage=document.getElementById('stage'),rc=rough.canvas(board);try{${safeCode}\nparent.postMessage({type:'athena-ready'},'*')}catch(error){ctx.fillStyle='#a78bfa';ctx.font='bold 32px Inter,sans-serif';ctx.fillText('Animation error: '+error.message,80,100);parent.postMessage({type:'athena-error',message:error.message},'*')}</script></body></html>`
 
-  // Listen for iframe messages
+  // Listen for iframe messages — with fallback timeout so animation never gets stuck
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data?.type === "athena-ready") setIframeReady(true)
+      if (e.data?.type === "athena-error") {
+        console.error("[Athena] Animation error:", e.data.message)
+        setIframeReady(true) // still show controls even on error
+      }
     }
     window.addEventListener("message", handler)
-    return () => window.removeEventListener("message", handler)
+
+    // Fallback: if iframe never reports ready, show it anyway after 5s
+    const fallback = setTimeout(() => setIframeReady(true), 5000)
+
+    return () => {
+      window.removeEventListener("message", handler)
+      clearTimeout(fallback)
+    }
   }, [])
+
+  // V2 Scene Renderer — uses the cinematic renderer when sceneJSON is provided
+  useEffect(() => {
+    console.log("[Athena Player] sceneJSON:", !!sceneJSON, "canvasRef:", !!canvasRef.current, "code:", !!code)
+    if (!sceneJSON || !canvasRef.current) return
+
+    // Stop any existing renderer
+    if (rendererRef.current) {
+      rendererRef.current.stop()
+      rendererRef.current = null
+    }
+
+    // Small delay to let canvas get proper dimensions after mount
+    const timer = setTimeout(() => {
+      if (!canvasRef.current) return
+      const canvas = canvasRef.current
+      try {
+        const result = renderScene(canvas, sceneJSON, (time, subtitle) => {
+          setCurrentTime(time)
+          if (subtitle) setCurrentSubtitle(subtitle)
+        })
+        rendererRef.current = result
+        setIframeReady(true)
+      } catch (err) {
+        console.error("[Athena] Renderer init failed:", err)
+        setIframeReady(true) // still show controls
+      }
+    }, 100)
+
+    return () => {
+      clearTimeout(timer)
+      if (rendererRef.current) {
+        rendererRef.current.stop()
+        rendererRef.current = null
+      }
+    }
+  }, [sceneJSON])
 
   // Load audio with WAV MIME type
   useEffect(() => {
     if (audio_base64 && audioRef.current) {
       const src = `data:audio/wav;base64,${audio_base64}`
       audioRef.current.src = src
-      if (isPlaying) {
-        audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e.message))
+      audioRef.current.load()
+      // Auto-play when ready
+      const playWhenReady = () => {
+        if (isPlaying && audioRef.current) {
+          audioRef.current.play().catch((e) => console.log("[Athena] Audio play failed:", e.message))
+        }
       }
+      audioRef.current.oncanplaythrough = playWhenReady
+      if (isPlaying) playWhenReady()
     }
   }, [audio_base64, isPlaying])
 
@@ -192,11 +259,33 @@ export function AnimationPlayerSync({
       </div>
 
       {/* Canvas */}
-      <div className="relative aspect-video w-full overflow-hidden bg-[#0a0a0a]">
-        {!iframeReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] z-10">
+      <div className="relative aspect-video w-full overflow-hidden bg-white">
+        {/* Canvas renderer — on top when sceneJSON, iframe behind as fallback */}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 size-full"
+          style={{
+            width: "100%",
+            height: "100%",
+            zIndex: sceneJSON ? 10 : -1,
+            pointerEvents: sceneJSON ? "auto" : "none",
+          }}
+        />
+        <iframe
+          key={renderKey}
+          ref={iframeRef}
+          title={`Animation: ${topic}`}
+          sandbox="allow-scripts"
+          srcDoc={sandboxDocument}
+          className="absolute inset-0 size-full border-0"
+          style={{ zIndex: sceneJSON ? -1 : 1 }}
+        />
+
+        {/* Loading overlay — only show when neither is ready */}
+        {!iframeReady && !sceneJSON && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
             <div className="flex flex-col items-center gap-3">
-              <svg className="size-12 text-white" fill="none" viewBox="0 0 64 64">
+              <svg className="size-12 text-foreground" fill="none" viewBox="0 0 64 64">
                 <rect x="8" y="8" width="48" height="48" rx="6" stroke="currentColor" strokeWidth="1.5" transform="rotate(45 32 32)" opacity="0.15" />
                 <rect className="athena-loader-path" x="8" y="8" width="48" height="48" rx="6" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" transform="rotate(45 32 32)" pathLength="100" />
               </svg>
@@ -205,17 +294,8 @@ export function AnimationPlayerSync({
           </div>
         )}
 
-        <iframe
-          key={renderKey}
-          ref={iframeRef}
-          title={`Animation: ${topic}`}
-          sandbox="allow-scripts"
-          srcDoc={sandboxDocument}
-          className="absolute inset-0 size-full border-0"
-        />
-
-        {/* Subtitle overlay */}
-        {showSubtitles && currentSubtitle && (
+        {/* Subtitle overlay — hidden by default, user can toggle with CC */}
+        {false && showSubtitles && currentSubtitle && (
           <div className="absolute inset-x-4 bottom-4 mx-auto max-w-2xl rounded-xl bg-black/75 px-5 py-3 text-center text-sm leading-relaxed text-white backdrop-blur-sm shadow-xl">
             {currentSubtitle}
           </div>
@@ -304,6 +384,29 @@ export function AnimationPlayerSync({
             >
               {speed}x
             </button>
+            {onVoiceChange && (
+              <button
+                className="flex h-8 items-center rounded-lg px-2 text-[10px] font-bold text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+                onClick={() => onVoiceChange(voice === "shubh" ? "shruti" : "shubh")}
+                title="Toggle voice"
+              >
+                {voice === "shubh" ? "♂" : "♀"}
+              </button>
+            )}
+            {onLanguageChange && (
+              <select
+                value={language}
+                onChange={(e) => onLanguageChange(e.target.value)}
+                className="h-8 rounded-lg bg-transparent px-1 text-[10px] font-bold text-muted-foreground transition-all hover:bg-accent hover:text-foreground border-0 outline-none cursor-pointer"
+              >
+                <option value="en-IN">EN</option>
+                <option value="hi-IN">HI</option>
+                <option value="ta-IN">TA</option>
+                <option value="te-IN">TE</option>
+                <option value="bn-IN">BN</option>
+                <option value="mr-IN">MR</option>
+              </select>
+            )}
           </div>
         </div>
       </div>

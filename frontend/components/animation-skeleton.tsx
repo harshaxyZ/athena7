@@ -6,6 +6,7 @@ type AnimationSkeletonProps = {
   part?: number
   total_parts?: number
   message?: string
+  status?: string
 }
 
 const steps = [
@@ -16,7 +17,7 @@ const steps = [
   "Polishing final frames",
 ]
 
-export function AnimationSkeleton({ part = 1, total_parts = 1, message }: AnimationSkeletonProps) {
+export function AnimationSkeleton({ part = 1, total_parts = 1, message, status }: AnimationSkeletonProps) {
   const [stepIndex, setStepIndex] = useState(0)
   const [progress, setProgress] = useState(0)
 
@@ -72,11 +73,13 @@ export function AnimationSkeleton({ part = 1, total_parts = 1, message }: Animat
         {/* Step message */}
         <div className="flex flex-col items-center gap-2">
           <p className="text-sm font-bold text-foreground">
-            {message || steps[stepIndex]}
+            {status || steps[stepIndex]}
           </p>
-          <p className="text-xs text-muted-foreground">
-            {total_parts > 1 ? `Part ${part} of ${total_parts}` : "Almost there — this takes 10–30s"}
-          </p>
+          {total_parts > 1 && (
+            <p className="text-xs text-muted-foreground">
+              Part {part} of {total_parts}
+            </p>
+          )}
         </div>
 
         {/* Progress bar */}

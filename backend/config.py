@@ -19,6 +19,9 @@ class Settings:
     OPENROUTER_VISUAL_PLANNER_MODEL: str = os.getenv("OPENROUTER_VISUAL_PLANNER_MODEL", "anthropic/claude-opus-4.8")
     OPENROUTER_VISUAL_GENERATOR_MODEL: str = os.getenv("OPENROUTER_VISUAL_GENERATOR_MODEL", "anthropic/claude-sonnet-4.6")
 
+    # ── Director AI (V2: outputs Scene JSON, not JS code) ────────
+    OPENROUTER_DIRECTOR_MODEL: str = os.getenv("OPENROUTER_DIRECTOR_MODEL", "qwen/qwen3-32b")
+
     # ── Sarvam AI TTS ──────────────────────────────────────────────
     SARVAM_API_KEY: str = os.getenv("SARVAM_API_KEY", "")
     SARVAM_BASE_URL: str = os.getenv("SARVAM_BASE_URL", "https://api.sarvam.ai")

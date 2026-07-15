@@ -78,7 +78,7 @@
   --secondary:           #1a1a1a;
   --secondary-foreground:#f2f2f2;
   --muted:               #1a1a1a;
-  --muted-foreground:    #737373;
+  --muted-foreground:    #b4b4b4;
   --accent:              #1f1f1f;
   --accent-foreground:   #f2f2f2;
   --border:              #252525;
@@ -105,7 +105,7 @@
     --secondary:           #1a1a1a;
     --secondary-foreground:#f2f2f2;
     --muted:               #1a1a1a;
-    --muted-foreground:    #737373;
+    --muted-foreground:    #b4b4b4;
     --accent:              #1f1f1f;
     --accent-foreground:   #f2f2f2;
     --border:              #252525;
@@ -232,4 +232,13 @@
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+
+/* ─── HIDE SCROLLBAR ────────────────────────────────────────────── */
+.hide-scrollbar {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;      /* IE/Edge */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;                  /* Chrome/Safari */
 }

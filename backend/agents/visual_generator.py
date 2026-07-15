@@ -1,8 +1,12 @@
 """
-Visual Generator — produces browser JavaScript for canvas animation.
+Visual Generator — produces Scene JSON for the cinematic renderer.
 
-Restored from original Vidya codebase with Gemini Flash for speed.
-Produces rich, animated educational scenes with rough.js/GSAP/p5.js.
+Architecture: LLM outputs structured Scene JSON (what to teach and how to present it).
+The renderer (frontend) owns all visual quality: composition, layout, colors, typography,
+spacing, camera movement, easing, transitions, and animation polish.
+
+The LLM NEVER generates Canvas/GSAP/JS code. It picks scene types from a fixed menu
+and describes semantic intent. The renderer turns that into premium 2D animation.
 """
 from __future__ import annotations
 
@@ -11,127 +15,300 @@ import json
 import logging
 import re
 
+from backend.config import settings
 from backend.dag.context import AgentContext, LessonStep
 from backend.services.llm import llm_chat
 
 logger = logging.getLogger("agents.visual_generator")
 
-VISUAL_SYSTEM_PROMPT = """You are a creative coding expert making animated, hand-drawn educational scenes.
 
-Write the BODY of a JavaScript function that draws ONE lesson scene. Your code runs
+# ─── SCENE JSON SCHEMA ──────────────────────────────────────────────
+# This is the contract between the Director AI and the frontend renderer.
+# The Director outputs JSON matching this schema. The renderer reads it
+# and produces cinematic animation. New scene types can be added by
+# extending SCENE_TYPES and adding a corresponding renderer function.
+
+SCENE_TYPES = [
+    "Hero",           # Big title + subtitle + atmospheric background
+    "FlowDiagram",    # Connected steps with arrows, staggered reveal
+    "Timeline",       # Events on a chronological line
+    "Mechanism",      # Labeled parts showing how something works
+    "CrossSection",   # Cutaway view with labeled layers
+    "Journey",        # Step-by-step path with progress
+    "Comparison",     # Side-by-side contrast
+    "Graph",          # Animated chart with counter
+    "Equation",       # Math with animated derivation
+    "Summary",        # Key takeaways with icons
+]
+
+CAMERA_TYPES = [
+    "static",         # No camera movement
+    "pushIn",         # Zoom into focus area
+    "pullOut",        # Zoom out to reveal context
+    "pan",            # Horizontal or vertical pan
+    "orbit",          # Circular camera movement
+    "zoom",           # General zoom in/out
+    "tilt",           # Vertical angle shift
+    "focusShift",     # Rack focus between elements
+]
+
+POSITIONS = [
+    "center", "left", "right", "top", "bottom",
+    "top-left", "top-right", "bottom-left", "bottom-right",
+    "left-third", "right-third", "full-width",
+]
+
+ENTER_ANIMATIONS = [
+    "slideUp", "slideDown", "fade", "scalePop",
+    "drawLine", "staggerReveal", "typewriter", "morphIn",
+]
+
+SCENE_JSON_SCHEMA_DESCRIPTION = """
+Scene JSON schema (the Director outputs this):
+
+{
+  "title": "string — lesson title",
+  "theme": "light" | "dark",
+  "totalDuration": number (seconds, 30-300),
+  "scenes": [
+    {
+      "type": one of SCENE_TYPES,
+      "duration": number (seconds for this scene),
+      "narration": "string — what the voiceover says during this scene",
+      "camera": {
+        "type": one of CAMERA_TYPES,
+        "focus": "semantic position like center, left-third, etc.",
+        "intensity": number (0.0-1.0, how dramatic the move is),
+        "duration": number (seconds, typically matches scene duration)
+      },
+      "beats": [
+        { "time": number (seconds from scene start), "subtitle": "string" }
+      ],
+      "data": { /* scene-type-specific content — see below */ }
+    }
+  ]
+}
+
+SCENE TYPE DATA SCHEMAS:
+
+Hero:
+  { "title": "string", "subtitle": "string", "emphasis": "string (optional tagline)" }
+
+FlowDiagram:
+  { "title": "string", "steps": [{"label": "string", "description": "optional"}], "direction": "horizontal"|"vertical" }
+
+Timeline:
+  { "title": "string", "events": [{"time": "string (label)", "label": "string", "description": "optional"}], "orientation": "horizontal"|"vertical" }
+
+Mechanism:
+  { "title": "string", "parts": [{"label": "string", "description": "string", "position": "semantic"}], "connections": [{"from": "label", "to": "label", "label": "optional"}] }
+
+CrossSection:
+  { "title": "string", "layers": [{"label": "string", "description": "string", "depth": number}], "cutaway": "optional description" }
+
+Journey:
+  { "title": "string", "steps": [{"label": "string", "description": "optional", "icon": "optional"}], "progress": number (0-100, starting progress) }
+
+Comparison:
+  { "title": "string", "left": {"heading": "string", "items": ["string"]}, "right": {"heading": "string", "items": ["string"]} }
+
+Graph:
+  { "title": "string", "chartType": "bar"|"pie"|"line", "data": [{"label": "string", "value": number}], "unit": "string" }
+
+Equation:
+  { "title": "string", "equation": "string", "steps": [{"label": "string", "expression": "string"}], "result": "string" }
+
+Summary:
+  { "title": "string", "takeaways": [{"label": "string", "description": "string"}] }
+"""
+
+DIRECTOR_SYSTEM_PROMPT = f"""You are the Director AI for Athena, an educational animation platform.
+
+Your job: read a lesson explanation and produce a Scene JSON that describes HOW to teach it visually.
+
+RULES:
+1. Output ONLY valid JSON. No markdown, no code fences, no explanations.
+2. Think like a motion graphics director — what should the viewer SEE at each moment?
+3. Describe INTENT, not pixels. Use semantic positions (center, left, right, top-left, etc.).
+4. The RENDERER handles all visual quality: colors, typography, spacing, easing, camera.
+5. Every scene understandable within 3 seconds.
+6. Each scene communicates ONE key idea. Don't overcrowd.
+7. Use 4-6 scenes for a typical lesson.
+8. Each scene needs: narration, beats with subtitles, camera.
+
+SCENE TYPES: Hero, FlowDiagram, Timeline, Mechanism, CrossSection, Comparison, Summary
+
+CAMERA: static, pushIn, pullOut, pan, orbit, zoom
+
+THEME: "light" for most topics. "dark" ONLY for astronomy/space/quantum physics.
+
+DURATION: Total MUST be 60-180 seconds. Each scene 10-25 seconds.
+
+BEATS: At least 2 per scene. 2-5 seconds apart. One clear sentence each.
+
+NARRATION: Speak to a student. Clear, concise. ~2.5 words per second.
+
+SCENE DATA SCHEMAS:
+
+Hero: {{"title":"string","subtitle":"string"}}
+FlowDiagram: {{"title":"string","steps":[{{"label":"string","description":"string"}}],"direction":"horizontal"|"vertical"}}
+Timeline: {{"title":"string","events":[{{"time":"string","label":"string"}}],"orientation":"horizontal"|"vertical"}}
+Mechanism: {{"title":"string","parts":[{{"label":"string","description":"string","position":"center|left|right|top|bottom"}}],"connections":[{{"from":"label","to":"label","label":"string"}}]}}
+CrossSection: {{"title":"string","layers":[{{"label":"string","description":"string","depth":1}}]}}
+Comparison: {{"title":"string","left":{{"heading":"string","items":["string"]}},"right":{{"heading":"string","items":["string"]}}}}
+Summary: {{"title":"string","takeaways":[{{"label":"string","description":"string"}}]}}
+
+OUTPUT FORMAT — return ONLY this JSON structure:
+{{
+  "title": "lesson title",
+  "theme": "light" or "dark",
+  "scenes": [
+    {{
+      "type": "scene type from list above",
+      "duration": number in seconds,
+      "narration": "what the voiceover says",
+      "camera": {{"type": "camera type", "focus": "position", "intensity": 0.1-0.5}},
+      "beats": [{{"time": number, "subtitle": "one sentence"}}],
+      "data": {{ scene-type-specific data from schemas above }}
+    }}
+  ]
+}}
+"""
+
+
+def _extract_json(raw: str) -> dict:
+    """Extract JSON from LLM output, handling markdown fences and trailing text."""
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r'^```[a-zA-Z]*\n?', '', cleaned)
+        cleaned = re.sub(r'\n?```$', '', cleaned).strip()
+    json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if json_match:
+        cleaned = json_match.group(0)
+    return json.loads(cleaned)
+
+
+def _validate_scene_json(data: dict) -> str | None:
+    """Validate Scene JSON structure. Returns error message or None if valid."""
+    if not isinstance(data, dict):
+        return "Root must be a JSON object"
+    if "scenes" not in data or not isinstance(data["scenes"], list):
+        return "Missing or invalid 'scenes' array"
+    if len(data["scenes"]) == 0:
+        return "scenes array is empty"
+    if len(data["scenes"]) > 10:
+        return "Too many scenes (max 10)"
+
+    valid_types = set(SCENE_TYPES)
+    for i, scene in enumerate(data["scenes"]):
+        if "type" not in scene:
+            return f"Scene {i}: missing 'type'"
+        if scene["type"] not in valid_types:
+            return f"Scene {i}: invalid type '{scene['type']}'. Must be one of: {', '.join(sorted(valid_types))}"
+        if "duration" not in scene:
+            return f"Scene {i}: missing 'duration'"
+        try:
+            dur = int(scene["duration"])
+            if dur < 3 or dur > 60:
+                return f"Scene {i}: duration must be 3-60 seconds, got {dur}"
+        except (ValueError, TypeError):
+            return f"Scene {i}: duration must be a number, got '{scene['duration']}'"
+        if "narration" not in scene or not scene["narration"]:
+            return f"Scene {i}: missing 'narration'"
+        if "beats" not in scene or not isinstance(scene["beats"], list) or len(scene["beats"]) < 1:
+            return f"Scene {i}: must have at least 1 beat marker"
+        if "data" not in scene or not isinstance(scene["data"], dict):
+            return f"Scene {i}: missing 'data' object"
+        if "camera" in scene and isinstance(scene["camera"], dict):
+            cam_type = scene["camera"].get("type", "static")
+            if cam_type not in CAMERA_TYPES:
+                return f"Scene {i}: invalid camera type '{cam_type}'"
+
+    return None
+
+VISUAL_SYSTEM_PROMPT = """You are a creative coding expert making animated, educational scenes.
+
+Write the BODY of a JavaScript function that draws ONE animated lesson scene. Your code runs
 inside a sandboxed iframe with these globals ALREADY available (do NOT import or redefine them):
-- `rough`   : Rough.js (hand-drawn/sketchy style). `rc` is a ready rough.canvas(board).
+- `rough`   : Rough.js (hand-drawn style). `rc` is a ready rough.canvas(board).
 - `p5`      : p5.js constructor for animation loops.
-- `fabric`  : Fabric.js for laid-out object scenes.
-- `paper`   : Paper.js — vector graphics on the canvas. Call `paper.view.update()` after drawing.
-- `anime`   : Anime.js — timeline-based DOM/CSS animations. Use `anime({...})` to animate
-              elements, values, or SVG attributes with easing and staggering.
-- `gsap`    : GSAP 3 — the most robust animation engine. Tween any JS object's values and
-              repaint the canvas in the onUpdate callback.
+- `anime`   : Anime.js — value-based animations with easing.
+- `gsap`    : GSAP 3 — timeline-based tweening.
 - `board`   : a <canvas> element, exactly 1600x900.
 - `ctx`     : board.getContext('2d').
-- `rc`      : rough.canvas(board) — use for sketchy shapes.
-- `stage`   : the container <div> (1600x900) holding the canvas.
+- `rc`      : rough.canvas(board).
 
-STYLE — make it look like an inspiring teacher sketching on a whiteboard:
-- PREFER rough.js (`rc`) for diagrams, arrows, boxes, circles, underlines — it gives the
-  hand-drawn look. e.g. rc.rectangle(x,y,w,h,{stroke:'#14b8a6',roughness:2});
-  rc.line(x1,y1,x2,y2,{stroke:'#ffffff'}); rc.circle(cx,cy,d,{fill:'#d9770640',fillStyle:'hachure'});
-- Use `ctx` for text: set ctx.font (e.g. "bold 40px Inter, sans-serif"), ctx.fillStyle, ctx.fillText(...).
-- Use `new p5(function(p){ p.setup=...; p.draw=...; }, stage)` ONLY when motion genuinely helps
-  (e.g. a moving particle, a growing bar, orbital motion). Size the p5 canvas to 1600x900.
-- Use `anime` for value-based animations — counters, progress bars, staggered reveals.
-  Example: anime({ targets: obj, val: 100, duration: 2000, easing: 'easeInOutQuad',
-  update: function() { ctx.fillText(Math.round(obj.val), 400, 300); } });
-- Use `gsap` for smooth sequenced reveals and timelines.
-  Example: gsap.timeline().to(obj1, {opacity:1, duration:0.5}).to(obj2, {opacity:1, duration:0.5});
+STYLE — make it visually rich, colorful, and dynamic:
+- Use `gsap.timeline()` for sequenced reveals with staggered timing.
+- Use `anime({...})` for counters, progress bars, morphing values.
+- Use `requestAnimationFrame` for continuous motion (particles, rotations, orbits).
+- Use `rc` for sketchy shapes (circles, arrows, boxes, lines).
+- Use `ctx` for bold text labels.
+- Make it MOVING — not static. At least 3 different animations staggered in time.
+- Use bright colors on dark background: #14b8a6 (teal), #f59e0b (amber), #ef4444 (red), #3b82f6 (blue), #8b5cf6 (purple), #ffffff (text).
 
-RULES — the program MUST run without throwing:
-- CANVAS SIZE: 1600 wide x 900 tall. ALL coordinates must use this full range.
-- CRITICAL: Content MUST start at y=70 (the title). Do NOT push content down to y=300+.
-- HARD LAYOUT RULE:
-  1. TITLE: x=80, y=70, font="bold 52px Inter" — ALWAYS start here
-  2. UNDERLINE: rc.line(80, 88, 80 + title_width, 88, ...)
-  3. MAIN CONTENT: fill x=80 to x=1500, y=120 to y=650
-     - Left half (x=80 to x=760): diagrams, illustrations
-     - Right half (x=800 to x=1500): labels, explanations
-  4. BOTTOM SUMMARY: x=80, y=720 to y=850 — key takeaway
-- NEVER use y > 850 or x > 1500
-- NEVER leave the right half or bottom area empty
-- Background is dark (#1a1a2e) — use white (#ffffff) for text, bright colors for shapes
-- Text sizes: titles 48-52px, body 28-36px, labels 24-28px
-- Colors: #14b8a6 (teal), #d97706 (amber), #059669 (green), #ef4444 (red), #ffffff (text)
-- Animate with setTimeout for staggered reveals so it feels like drawing step by step
+RULES:
+- CANVAS: 1600x900. Use the FULL canvas area.
+- TITLE at top-left (x=80, y=70, font bold 48px).
+- MAIN CONTENT: fill the center with animated diagrams/visualizations.
+- Background: #0f172a (dark navy).
+- At least 3 staggered animations using gsap or anime or requestAnimationFrame.
 - Use ONLY provided globals. No imports, no fetch, no external URLs.
-- Do NOT wrap in a function, do NOT include <script> tags, do NOT output HTML or markdown.
-- BE CONCISE: keep under ~120 lines.
+- Do NOT wrap in a function or include <script> tags.
+- Keep under ~150 lines.
+- DO NOT draw subtitle/caption text at the bottom of the canvas — the player has its own subtitle overlay.
+- Return ONLY raw JavaScript statements.
 
-Return ONLY raw JavaScript statements. Nothing else.
+EXAMPLE (animated diagram with motion):
+ctx.font = "bold 48px Inter, sans-serif"; ctx.fillStyle = "#ffffff";
+ctx.fillText("Photosynthesis", 80, 70);
+rc.line(80, 88, 480, 88, { stroke: '#14b8a6', strokeWidth: 3 });
 
-EXAMPLE 1 (sketchy diagram with animation):
-// TITLE
-ctx.font = "bold 52px Inter, sans-serif"; ctx.fillStyle = "#ffffff";
-ctx.fillText("Water Cycle", 80, 70);
-rc.line(80, 88, 430, 88, { stroke: '#14b8a6', strokeWidth: 3, roughness: 1 });
+// Sun with pulsing glow
+var sunScale = {val: 1};
+rc.circle(300, 350, 200, { fill: '#f59e0b30', stroke: '#f59e0b', strokeWidth: 2, roughness: 1.5 });
+ctx.font = "bold 28px Inter"; ctx.fillStyle = "#f59e0b"; ctx.fillText("☀ Sun", 255, 360);
+anime({ targets: sunScale, val: [1, 1.15, 1], duration: 2000, loop: true, easing: 'easeInOutQuad',
+  update: function() { /* pulse effect */ }
+});
 
-// LEFT — Sun + evaporation
-rc.circle(340, 400, 260, { fill: '#d9770640', fillStyle: 'solid', stroke: '#d97706', roughness: 2 });
-ctx.font = "bold 36px Inter, sans-serif"; ctx.fillStyle = "#d97706"; ctx.fillText("Sun", 305, 410);
-
-// Animated arrows (staggered)
+// Animated arrows with stagger
 var arrows = [
-  {x1:520, y1:400, x2:680, y2:280, label:"Evaporation", color:"#14b8a6"},
-  {x1:700, y1:250, x2:1000, y2:250, label:"Condensation", color:"#059669"},
-  {x1:1100, y1:280, x2:1100, y2:500, label:"Rain", color:"#3b82f6"},
+  {x1:450, y1:350, x2:650, y2:250, label:"Light Energy", color:"#f59e0b"},
+  {x1:700, y1:250, x2:1000, y2:250, label:"Chlorophyll", color:"#22c55e"},
+  {x1:1050, y1:300, x2:1050, y2:500, label:"Glucose", color:"#14b8a6"},
 ];
 arrows.forEach(function(a, i) {
-  setTimeout(function() {
-    rc.line(a.x1, a.y1, a.x2, a.y2, { stroke: a.color, strokeWidth: 3, roughness: 1.5 });
-    rc.rectangle(a.x2-80, a.y2-30, 160, 60, { fill: a.color+'20', stroke: a.color, roughness: 1 });
-    ctx.font = "bold 24px Inter, sans-serif"; ctx.fillStyle = "#ffffff";
-    ctx.fillText(a.label, a.x2-50, a.y2+8);
-  }, i * 600);
+  var lineProgress = {val: 0};
+  anime({ targets: lineProgress, val: 1, duration: 1000, delay: i * 500, easing: 'easeOutQuad',
+    update: function() {
+      var cx = a.x1 + (a.x2 - a.x1) * lineProgress.val;
+      var cy = a.y1 + (a.y2 - a.y1) * lineProgress.val;
+      rc.line(a.x1, a.y1, cx, cy, { stroke: a.color, strokeWidth: 3 });
+      if (lineProgress.val >= 0.9) {
+        ctx.font = "bold 22px Inter"; ctx.fillStyle = "#ffffff";
+        ctx.fillText(a.label, a.x2 + 10, a.y2 + 8);
+      }
+    }
+  });
 });
 
-// BOTTOM SUMMARY
-rc.rectangle(80, 720, 1440, 100, { fill: '#14b8a610', stroke: '#14b8a6', roughness: 1 });
-ctx.font = "22px Inter, sans-serif"; ctx.fillStyle = "#94a3b8";
-ctx.fillText("Key: Water continuously moves between Earth and atmosphere", 120, 780);
+// Rotating leaf
+var leafAngle = 0;
+function drawLeaf() {
+  ctx.save();
+  ctx.translate(800, 400);
+  ctx.rotate(leafAngle);
+  rc.ellipse(0, 0, 120, 60, { fill: '#22c55e40', stroke: '#22c55e', roughness: 1 });
+  ctx.restore();
+  leafAngle += 0.02;
+  requestAnimationFrame(drawLeaf);
+}
+drawLeaf();
 
-EXAMPLE 2 (animated counter with anime.js):
-ctx.font = "bold 52px Inter, sans-serif"; ctx.fillStyle = "#ffffff";
-ctx.fillText("Photosynthesis", 80, 70);
-rc.line(80, 88, 520, 88, { stroke: '#14b8a6', strokeWidth: 3 });
-
-// Animated percentage counter
-var counter = {val: 0};
-anime({ targets: counter, val: 85, duration: 2500, easing: 'easeInOutQuad',
-  update: function() {
-    ctx.clearRect(80, 200, 400, 100);
-    ctx.font = "bold 80px Inter, sans-serif"; ctx.fillStyle = "#d97706";
-    ctx.fillText(Math.round(counter.val) + "%", 80, 290);
-    ctx.font = "24px Inter, sans-serif"; ctx.fillStyle = "#94a3b8";
-    ctx.fillText("Energy conversion efficiency", 80, 320);
-  }
-});
-
-// Staggered concept boxes
-var concepts = [
-  {x:600, y:180, w:400, h:70, text:"Sunlight → Chemical Energy", color:"#d97706"},
-  {x:600, y:280, w:400, h:70, text:"CO2 + H2O → Glucose + O2", color:"#14b8a6"},
-  {x:600, y:380, w:400, h:70, text:"Chlorophyll captures light", color:"#059669"},
-];
-concepts.forEach(function(c, i) {
-  setTimeout(function() {
-    rc.rectangle(c.x, c.y, c.w, c.h, { fill: c.color+'15', stroke: c.color, roughness: 1 });
-    ctx.font = "bold 22px Inter, sans-serif"; ctx.fillStyle = "#ffffff";
-    ctx.fillText(c.text, c.x+20, c.y+45);
-  }, 800 + i * 500);
-});
-
-rc.rectangle(80, 720, 1440, 100, { fill: '#14b8a610', stroke: '#14b8a6', roughness: 1 });
-ctx.font = "22px Inter, sans-serif"; ctx.fillStyle = "#94a3b8";
-ctx.fillText("Key: Plants convert sunlight into food using chlorophyll", 120, 780);
+rc.rectangle(80, 750, 1440, 80, { fill: '#14b8a610', stroke: '#14b8a6', roughness: 1 });
+ctx.font = "20px Inter"; ctx.fillStyle = "#94a3b8";
+ctx.fillText("Key: Plants capture sunlight and convert it to chemical energy", 120, 795);
 """
 
 
@@ -146,7 +323,7 @@ def _sanitize(code: str) -> str:
 
 def _validation_error(code: str) -> str | None:
     lowered = code.lower()
-    forbidden = ["import ", "from ", "def ", "class ", "self.", "manim", "numpy", "fetch(", "xmlhttprequest", "websocket", "localstorage", "sessionstorage", "document.cookie", "window.parent", "window.top", "eval("]
+    forbidden = ["import ", "def ", "class ", "self.", "manim", "numpy", "fetch(", "xmlhttprequest", "websocket", "localstorage", "sessionstorage", "document.cookie", "window.parent", "window.top", "eval("]
     match = next((item for item in forbidden if item in lowered), None)
     if match:
         return f"Forbidden API or syntax: {match.strip()}"
@@ -218,19 +395,36 @@ def _estimate_duration(storyboard: dict) -> int:
     if beats and isinstance(beats, list) and len(beats) > 0:
         last_beat = beats[-1]
         if isinstance(last_beat, dict) and "time" in last_beat:
-            return int(last_beat.get("time", 14)) + 2
-    return int(storyboard.get("duration", 14))
+            try:
+                t = last_beat.get("time", 14)
+                if isinstance(t, str) and ":" in t:
+                    parts = t.split(":")
+                    t = int(parts[0]) * 60 + int(parts[1])
+                return int(t) + 2
+            except (ValueError, TypeError):
+                pass
+    dur = storyboard.get("duration", 15)
+    try:
+        if isinstance(dur, str) and ":" in dur:
+            parts = dur.split(":")
+            dur = int(parts[0]) * 60 + int(parts[1])
+        return max(8, min(30, int(dur)))
+    except (ValueError, TypeError):
+        return 15
 
 
 async def generate_chat_visual(topic: str, description: str, session_id: str = "", part: int = 1, total_parts: int = 1) -> dict:
     """Plan, code, and validate a topic-specific canvas animation with multi-part support."""
     part_suffix = f"\n[PART {part} OF {total_parts}]" if total_parts > 1 else ""
     plan_prompt = [
-        {"role": "system", "content": "You are an animation director. Return compact JSON only with title, caption, duration (seconds), visual_style, and 3-5 timed beats containing action, objects, camera, and narration."},
-        {"role": "user", "content": f"Exact student request: {topic}\nTeaching context: {description[:900]}{part_suffix}\n\nRETURN ONLY VALID JSON."}
+        {"role": "system", "content": "Return compact JSON only: title, caption (2 sentences), duration (10-20 seconds), visual_style, and 3-5 timed beats with action, objects, camera, and subtitle fields."},
+        {"role": "user", "content": f"Topic: {topic}\nContext: {description[:500]}{part_suffix}\n\nRETURN ONLY VALID JSON."}
     ]
-    plan_raw = await llm_chat(messages=plan_prompt, model=settings.OPENROUTER_VISUAL_PLANNER_MODEL, temperature=0.35, max_tokens=900, agent="visual_planner", session_id=session_id)
-    cleaned_plan = re.sub(r"^```json\s*|\s*```$", "", plan_raw.strip(), flags=re.IGNORECASE)
+    plan_raw = await llm_chat(messages=plan_prompt, model=settings.OPENROUTER_VISUAL_PLANNER_MODEL, temperature=0.35, max_tokens=1000, agent="visual_planner", session_id=session_id)
+    # Extract JSON robustly using regex if there's markdown wrapping or trailing text
+    import re
+    json_match = re.search(r"(\{.*\})", plan_raw, re.DOTALL)
+    cleaned_plan = json_match.group(1) if json_match else plan_raw.strip()
     try:
         plan = json.loads(cleaned_plan)
     except json.JSONDecodeError as exc:
@@ -238,7 +432,7 @@ async def generate_chat_visual(topic: str, description: str, session_id: str = "
 
     # Validate and fix duration
     duration = _estimate_duration(plan)
-    plan["duration"] = max(8, min(300, duration))
+    plan["duration"] = max(8, min(30, duration))
 
     messages = [
         {"role": "system", "content": VISUAL_SYSTEM_PROMPT},
@@ -247,7 +441,7 @@ async def generate_chat_visual(topic: str, description: str, session_id: str = "
     feedback = ""
     for attempt in range(2):
         request = messages if not feedback else messages + [{"role": "user", "content": f"The previous program failed validation: {feedback}. Rewrite it as safe raw JavaScript only."}]
-        code = await llm_chat(messages=request, model=settings.OPENROUTER_VISUAL_GENERATOR_MODEL, temperature=0.45, max_tokens=3200, agent="visual_generator", session_id=session_id)
+        code = await llm_chat(messages=request, model=settings.OPENROUTER_VISUAL_GENERATOR_MODEL, temperature=0.45, max_tokens=3000, agent="visual_generator", session_id=session_id)
         program = _sanitize(code)
         feedback = _validation_error(program) or ""
         if not feedback:
@@ -280,7 +474,7 @@ async def generate_multipart_animations(topic: str, full_explanation: str, sessi
     """Intelligently split long animations into parts and generate them with pre-fetching."""
     # Estimate total duration from explanation length
     estimated_minutes = max(1, len(full_explanation.split()) // 150)
-    
+
     if estimated_minutes <= 3:
         # Single animation
         animation = await generate_chat_visual(topic, full_explanation, session_id, part=1, total_parts=1)
@@ -290,13 +484,13 @@ async def generate_multipart_animations(topic: str, full_explanation: str, sessi
             "total_parts": 1,
             "total_duration": animation["duration"],
         }
-    
+
     elif estimated_minutes <= 5:
         # Two parts: generate part 1, queue part 2
         part1 = await generate_chat_visual(topic, full_explanation, session_id, part=1, total_parts=2)
         # Queue part 2 in background (don't await yet)
         part2_task = asyncio.create_task(generate_chat_visual(topic, full_explanation, session_id, part=2, total_parts=2))
-        
+
         return {
             "type": "multipart",
             "parts": [part1],
@@ -304,13 +498,13 @@ async def generate_multipart_animations(topic: str, full_explanation: str, sessi
             "total_parts": 2,
             "total_duration": part1["duration"],  # Will add part 2 duration when ready
         }
-    
+
     else:
         # Three parts: generate part 1, queue parts 2 and 3
         part1 = await generate_chat_visual(topic, full_explanation, session_id, part=1, total_parts=3)
         part2_task = asyncio.create_task(generate_chat_visual(topic, full_explanation, session_id, part=2, total_parts=3))
         part3_task = asyncio.create_task(generate_chat_visual(topic, full_explanation, session_id, part=3, total_parts=3))
-        
+
         return {
             "type": "multipart",
             "parts": [part1],
@@ -318,3 +512,119 @@ async def generate_multipart_animations(topic: str, full_explanation: str, sessi
             "total_parts": 3,
             "total_duration": part1["duration"],
         }
+
+
+# ─── NEW: Scene JSON Pipeline (V2 Architecture) ──────────────────────
+# The Director AI outputs Scene JSON. The frontend renderer reads it
+# and produces cinematic animation. No LLM-generated JS code.
+
+async def generate_scene_json(
+    topic: str,
+    explanation: str,
+    session_id: str = "",
+) -> dict:
+    """
+    Single-call pipeline: Director reads explanation → outputs Scene JSON.
+
+    Returns dict with:
+      - "scene_json": the validated Scene JSON (dict)
+      - "total_duration": total animation duration in seconds
+      - "narration": combined narration text for TTS
+      - "beats": flattened beat list for subtitle sync
+    """
+    messages = [
+        {"role": "system", "content": DIRECTOR_SYSTEM_PROMPT},
+        {"role": "user", "content": (
+            f"Topic: {topic}\n\n"
+            f"Lesson explanation to visualize:\n{explanation[:2000]}\n\n"
+            f"Produce the Scene JSON for this lesson. "
+            f"Total duration should match the explanation length "
+            f"(roughly 2.5 words per second of narration)."
+        )},
+    ]
+
+    max_attempts = 2
+    last_error = None
+
+    for attempt in range(max_attempts):
+        try:
+            raw = await asyncio.wait_for(
+                llm_chat(
+                    messages=messages,
+                    model=settings.OPENROUTER_DIRECTOR_MODEL,
+                    temperature=0.4,
+                    max_tokens=4000,
+                    agent="director",
+                    session_id=session_id,
+                ),
+                timeout=60.0,
+            )
+
+            scene_json = _extract_json(raw)
+            validation_error = _validate_scene_json(scene_json)
+            if validation_error:
+                last_error = validation_error
+                messages.append({"role": "user", "content": (
+                    f"Your JSON had an error: {validation_error}\n"
+                    f"Fix it and return valid Scene JSON only."
+                )})
+                continue
+
+            # Extract combined narration and beats
+            all_narrations = []
+            all_beats = []
+            time_offset = 0
+            for scene in scene_json["scenes"]:
+                all_narrations.append(scene.get("narration", ""))
+                for beat in scene.get("beats", []):
+                    all_beats.append({
+                        "time": beat.get("time", 0) + time_offset,
+                        "subtitle": beat.get("subtitle", ""),
+                    })
+                time_offset += scene.get("duration", 10)
+
+            total_duration = sum(s.get("duration", 10) for s in scene_json["scenes"])
+
+            return {
+                "scene_json": scene_json,
+                "total_duration": total_duration,
+                "narration": " ".join(all_narrations),
+                "beats": all_beats,
+            }
+
+        except json.JSONDecodeError as e:
+            last_error = f"JSON parse error: {e}"
+            messages.append({"role": "user", "content": (
+                f"Your output was not valid JSON: {e}\n"
+                f"Return ONLY a valid JSON object, no markdown fences."
+            )})
+        except asyncio.TimeoutError:
+            last_error = "Director timed out after 60s"
+            logger.warning(f"Director attempt {attempt + 1} timed out")
+            break
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f"Director attempt {attempt + 1} failed: {e}")
+            break
+
+    # All attempts failed — generate a simple fallback scene
+    logger.warning(f"Director failed, using fallback scene: {last_error}")
+    return {
+        "scene_json": {
+            "title": topic[:50],
+            "theme": "light",
+            "scenes": [{
+                "type": "Hero",
+                "duration": max(60, len(explanation.split()) // 3),
+                "narration": explanation[:500],
+                "camera": {"type": "static", "focus": "center", "intensity": 0.1},
+                "beats": [{"time": 0, "subtitle": explanation[:100]}],
+                "data": {"title": topic[:50], "subtitle": "Visual explanation"}
+            }],
+        },
+        "total_duration": max(60, len(explanation.split()) // 3),
+        "narration": explanation[:500],
+        "beats": [{"time": 0, "subtitle": explanation[:100]}],
+    }
+
+    # All attempts failed — fallback scene returned above

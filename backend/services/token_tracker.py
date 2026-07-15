@@ -14,13 +14,13 @@ logger = logging.getLogger("services.token_tracker")
 
 # Pricing per million tokens (USD)
 MODEL_PRICING: dict[str, dict[str, float]] = {
-    "z-ai/glm-5.2":                    {"input": 0.392,  "output": 1.232},
+    "qwen/qwen3-32b":                 {"input": 0.50,   "output": 1.50},
+    "qwen/qwen3-coder":               {"input": 0.22,   "output": 1.80},
     "anthropic/claude-sonnet-4-6":     {"input": 3.00,   "output": 15.00},
     "anthropic/claude-sonnet-4.6":     {"input": 3.00,   "output": 15.00},
     "anthropic/claude-opus-4.8":       {"input": 15.00,  "output": 75.00},
     "anthropic/claude-fable-5":        {"input": 5.00,   "output": 25.00},
-    "qwen/qwen-3.6-flash-02-12":       {"input": 0.07,   "output": 0.28},
-    "google/gemini-2.5-flash":         {"input": 0.075,  "output": 0.30},
+    "google/gemini-2.5-flash":         {"input": 0.30,   "output": 2.50},
     "default":                         {"input": 0.50,   "output": 1.50},
 }
 
